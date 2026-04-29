@@ -58,8 +58,9 @@ fi
 export AITER_LOG_LEVEL=WARNING
 
 # Pull in the AITER pieces that matter for DSv4 FP4 on MI355X:
-#   * origin/main@8c27e66f includes ROCm/aiter#2770 a16w4 MoE support and
-#     ROCm/aiter#2916 mhc_pre device-allocation fix.
+#   * origin/main@bb4ea92e includes ROCm/aiter#2770 a16w4 MoE support,
+#     ROCm/aiter#2916 mhc_pre device-allocation fix, and ROCm/aiter#2924
+#     FlyDSL GDR decode tuned configs.
 #   * ROCm/aiter#2822 speeds up batched MXFP4 GEMM on gfx950.
 #   * ROCm/aiter#2900 fixes MXFP4 scale padding for non-256 K.
 #   * ROCm/aiter#2642 enables/fixes TP=4/8 MXFP4 MoE dispatch.
@@ -74,7 +75,7 @@ export AITER_LOG_LEVEL=WARNING
 if [ "${AITER_DSV4_PERF_STACK:-1}" = "1" ]; then
     AITER_PERF_REPO=${AITER_PERF_REPO:-https://github.com/ROCm/aiter.git}
     AITER_PERF_DIR=${AITER_PERF_DIR:-/tmp/aiter-dsv4-fp4-perf}
-    AITER_PERF_BASE_SHA=${AITER_PERF_BASE_SHA:-8c27e66f8078c8e1e9ac4f55a5481e2a37db96f0}
+    AITER_PERF_BASE_SHA=${AITER_PERF_BASE_SHA:-bb4ea92eaf7a8420ab6bcc460095d310d02dd628}
     AITER_PERF_PATCH_REFS=(
         "${AITER_PERF_BATCHED_FP4_REF:-pull/2822/head}"
         "${AITER_PERF_MXFP4_SCALE_REF:-pull/2900/head}"
@@ -143,6 +144,9 @@ required = {
         "device = residual.device" in mhc
         and "dtype=dtypes.bf16, device=device" in mhc
     ),
+    "FlyDSL GDR decode tuned configs": (
+        root / "ops" / "flydsl" / "gdr_decode_tuned.jsonl"
+    ).exists(),
     "MXFP4 scaleN_pad fix": "scaleN_pad" in fp4_utils,
     "DSv4 FP4 tuned fMoE config": dsv4_tuned_fmoe is None or dsv4_tuned_fmoe.exists(),
 }
