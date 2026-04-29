@@ -24,6 +24,14 @@ fi
 
 nvidia-smi
 
+# GPU calibration: matmul + allreduce baseline before serving benchmark.
+CALIBRATE_SCRIPT="$(dirname "$0")/../gpu_calibrate.py"
+if [ -f "$CALIBRATE_SCRIPT" ]; then
+    echo "=== Running GPU calibration ==="
+    torchrun --nproc_per_node=auto "$CALIBRATE_SCRIPT" --output "$PWD/gpu_calibrate.csv"
+    echo "=== GPU calibration done ==="
+fi
+
 # Common SGLANG env vars (apply to every config).
 export SGLANG_JIT_DEEPGEMM_PRECOMPILE=0
 export SGLANG_OPT_SWA_SPLIT_LEAF_ON_INSERT=1
