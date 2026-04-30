@@ -1742,11 +1742,13 @@ dsv4-fp4-b200-trt:
   - isl: 1024
     osl: 1024
     search-space:
-    - { tp: 8, ep: 8, conc-start: 1, conc-end: 8 }
+    - { tp: 8, conc-start: 1, conc-end: 32 }
+    - { tp: 8, ep: 8, dp-attn: true, conc-start: 32, conc-end: 256 }
   - isl: 8192
     osl: 1024
     search-space:
-    - { tp: 8, ep: 8, conc-start: 1, conc-end: 8 }
+    - { tp: 8, conc-start: 1, conc-end: 32 }
+    - { tp: 8, ep: 8, dp-attn: true, conc-start: 32, conc-end: 256 }
 
 # MTP variant of dsv4-fp4-b200-vllm. Mirrors the base search space and adds
 # --speculative-config '{"method":"mtp","num_speculative_tokens":2}'.
@@ -2598,11 +2600,11 @@ dsv4-fp4-b300-trt:
   - isl: 1024
     osl: 1024
     search-space:
-    - { tp: 8, ep: 8, conc-start: 1, conc-end: 8 }
+    - { tp: 8, ep: 8, dp-attn: true, conc-start: 1, conc-end: 8 }
   - isl: 8192
     osl: 1024
     search-space:
-    - { tp: 8, ep: 8, conc-start: 1, conc-end: 8 }
+    - { tp: 8, ep: 8, dp-attn: true, conc-start: 1, conc-end: 8 }
 
 dsv4-fp4-b300-vllm-mtp:
   image: vllm/vllm-openai:v0.20.0-cu130
