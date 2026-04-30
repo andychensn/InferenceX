@@ -235,7 +235,7 @@ The corresponding `SingleNodeMatrixEntry` enforces these same fields with approp
 
 2. **`extra='forbid'`**: Unknown fields are rejected, preventing typos or deprecated fields from slipping through.
 
-3. **Strict typing**: Fields like `spec-decoding` use `Literal["mtp", "draft_model", "none"]` to restrict values to known options.
+3. **Strict typing**: Fields like `spec-decoding` use `Literal` types to restrict values to known options; see `utils/matrix_logic/validation.py` for the current set.
 
 4. **Concurrency validation**: The system ensures either `conc-list` OR `conc-start`/`conc-end` is provided, but not both.
 
