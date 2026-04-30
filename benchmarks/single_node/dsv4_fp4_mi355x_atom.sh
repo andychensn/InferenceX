@@ -21,9 +21,8 @@ echo "TP: $TP, CONC: $CONC, ISL: $ISL, OSL: $OSL, EP_SIZE: $EP_SIZE"
 
 # ROCm/ATOM#650 is still a PR1 DSv4 skeleton. The local overlay below gives
 # DSv4 persistent per-request cache slots so CONC>1 no longer corrupts the
-# recurrent KV/compressor/indexer state. It is still eager and not vectorized
-# across requests, so keep sweep points modest until upstream lands the native
-# multi-request sparse-attention/cache path.
+# recurrent KV/compressor/indexer state. It keeps sparse attention per sequence,
+# but batches attention projections, mHC, and MoE/FFN work layer-by-layer.
 if [ "$EP_SIZE" -ne 1 ]; then
     echo "FATAL: ROCm/ATOM#650 PR1 has not validated expert parallel serving; EP_SIZE must be 1, got $EP_SIZE" >&2
     exit 1
@@ -283,11 +282,12 @@ PYEOF
     # Local multi-request overlay for ROCm/ATOM#650. ATOM's scheduler passes
     # DSv4 a token-flat batch, but PR650 treats every request as cache slot 0
     # (`kv_cache[:1]` and matching compressor/indexer state). Reuse ATOM's
-    # mamba-state slot allocator for DSv4, then run each sequence against its
-    # persistent slot. This fixes correctness for CONC>1; it is intentionally
-    # conservative and still loops requests until upstream vectorizes the DSv4
+    # mamba-state slot allocator for DSv4, then split only sparse attention and
+    # cache mutation per sequence while batching attention projections, mHC, and
+    # MoE/FFN layer-by-layer. This fixes correctness for CONC>1 and avoids the
+    # worst all-layers-per-request loop until upstream vectorizes the DSv4
     # sparse-attention/cache path.
-    sed 's/^$/ /' <<'PATCH' | git apply
+    sed 's/^$/ /' <<'PATCH' | git apply --recount
 diff --git a/atom/model_engine/llm_engine.py b/atom/model_engine/llm_engine.py
 index 8de9532..ddde446 100644
 --- a/atom/model_engine/llm_engine.py
@@ -560,7 +560,7 @@ index 46cf1b0..0d84c78 100644
              else:
                  compress_topk_idxs = _get_compress_topk_idxs(
                      ratio, 1, seqlen, start_pos, offset, device=x.device
-@@ -1037,26 +1045,26 @@ class DeepseekV4Attention(nn.Module):
+@@ -1037,42 +1045,136 @@ class DeepseekV4Attention(nn.Module):
          # implicit B=1.) -----
          if start_pos == 0:
              if seqlen <= win:
@@ -594,7 +594,116 @@ index 46cf1b0..0d84c78 100644
                  self.attn_sink,
                  topk_idxs,
                  self.softmax_scale,
-@@ -1599,6 +1607,7 @@ class Block(nn.Module):
+             )
+
+         # Inverse RoPE on output's rope dims to remove absolute-position contribution
+         # carried in by the value-side RoPE of the KV entries.
+         _apply_rotary_emb(o[..., -rd:], freqs_cis, inverse=True)
+
+         # ----- Grouped output LoRA -----
+         # o: [1, S, H, D] → drop B; reshape into groups for the einsum.
+         o = o.squeeze(0).view(seqlen, self.n_local_groups, -1)  # [S, g, H/g * D]
+         wo_a = self.wo_a.weight.view(self.n_local_groups, self.o_lora_rank, -1)
+         o = torch.einsum("sgd,grd->sgr", o, wo_a)  # [S, g, o_lora_rank]
+         x = self.wo_b(o.flatten(1))  # 2D [S, dim]
+         return x
+
++    def forward_batched(
++        self, x: torch.Tensor, seq_meta: list[tuple[int, int, int, int]]
++    ) -> torch.Tensor:
++        assert (
++            x.dim() == 2
++        ), f"DeepseekV4Attention expects 2D [num_tokens, dim], got {x.shape}"
++        total_tokens = x.size(0)
++        win = self.window_size
++        ratio = self.compress_ratio
++        rd = self.rope_head_dim
++
++        if self.compress_ratio and self.compressor.kv_cache is None:
++            self.compressor.kv_cache = self.kv_cache[:, win:]
++            self.compressor.freqs_cis = self.freqs_cis
++            if self.indexer is not None:
++                self.indexer.freqs_cis = self.freqs_cis
++
++        qr_all = self.q_norm(self.wq_a(x))
++        q_all = self.wq_b(qr_all).view(total_tokens, self.n_local_heads, self.head_dim)
++        q_all = q_all * torch.rsqrt(q_all.square().mean(-1, keepdim=True) + self.eps)
++        kv_all = self.kv_norm(self.wkv(x)).view(total_tokens, self.head_dim)
++
++        outputs = []
++        for start, end, start_pos, cache_slot in seq_meta:
++            seqlen = end - start
++            freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]
++            slot = slice(cache_slot, cache_slot + 1)
++
++            if start_pos == 0:
++                self.kv_cache[slot].zero_()
++                if self.compress_ratio:
++                    self.compressor.kv_state[slot].zero_()
++                    self.compressor.score_state[slot].fill_(float("-inf"))
++                    if self.indexer is not None:
++                        self.indexer.kv_cache[slot].zero_()
++                        self.indexer.compressor.kv_state[slot].zero_()
++                        self.indexer.compressor.score_state[slot].fill_(float("-inf"))
++
++            q = q_all[start:end].unsqueeze(0)
++            _apply_rotary_emb(q[..., -rd:], freqs_cis)
++            kv = kv_all[start:end].unsqueeze(0)
++            _apply_rotary_emb(kv[..., -rd:], freqs_cis)
++            act_quant_inplace(kv[..., :-rd], 64, self.scale_fmt)
++
++            topk_idxs = _get_window_topk_idxs(
++                win, 1, seqlen, start_pos, device=x.device
++            )
++            if self.compress_ratio:
++                offset = kv.size(1) if start_pos == 0 else win
++                if self.indexer is not None:
++                    compress_topk_idxs = self.indexer(
++                        x[start:end], qr_all[start:end], start_pos, offset, cache_slot
++                    )
++                else:
++                    compress_topk_idxs = _get_compress_topk_idxs(
++                        ratio, 1, seqlen, start_pos, offset, device=x.device
++                    )
++                topk_idxs = torch.cat([topk_idxs, compress_topk_idxs], dim=-1)
++            topk_idxs = topk_idxs.int()
++
++            if start_pos == 0:
++                if seqlen <= win:
++                    self.kv_cache[slot, :seqlen] = kv
++                else:
++                    cutoff = seqlen % win
++                    (
++                        self.kv_cache[slot, cutoff:win],
++                        self.kv_cache[slot, :cutoff],
++                    ) = kv[:, -win:].split([win - cutoff, cutoff], dim=1)
++                if self.compress_ratio:
++                    kv_compress = self.compressor(x[start:end], start_pos, cache_slot)
++                    if kv_compress is not None:
++                        kv = torch.cat([kv, kv_compress], dim=1)
++                o = sparse_attn(q, kv, self.attn_sink, topk_idxs, self.softmax_scale)
++            else:
++                self.kv_cache[slot, start_pos % win] = kv.squeeze(1)
++                if self.compress_ratio:
++                    self.compressor(x[start:end], start_pos, cache_slot)
++                o = sparse_attn(
++                    q,
++                    self.kv_cache[slot],
++                    self.attn_sink,
++                    topk_idxs,
++                    self.softmax_scale,
++                )
++
++            _apply_rotary_emb(o[..., -rd:], freqs_cis, inverse=True)
++            outputs.append(o.squeeze(0))
++
++        o = torch.cat(outputs, dim=0).view(total_tokens, self.n_local_groups, -1)
++        wo_a = self.wo_a.weight.view(self.n_local_groups, self.o_lora_rank, -1)
++        o = torch.einsum("sgd,grd->sgr", o, wo_a)
++        return self.wo_b(o.flatten(1))
++
+
+@@ -1599,6 +1701,7 @@ class Block(nn.Module):
          x: torch.Tensor,
          start_pos: int,
          input_ids: Optional[torch.Tensor],
@@ -602,7 +711,7 @@ index 46cf1b0..0d84c78 100644
      ) -> torch.Tensor:
          # ----- Attention sub-layer with mHC mixing -----
          residual = x
-@@ -1606,7 +1615,7 @@ class Block(nn.Module):
+@@ -1606,7 +1709,7 @@ class Block(nn.Module):
              x, self.hc_attn_fn, self.hc_attn_scale, self.hc_attn_base
          )
          x = self.attn_norm(x)
@@ -611,7 +720,7 @@ index 46cf1b0..0d84c78 100644
          x = self.hc_post(x, residual, post, comb)
 
          # ----- FFN sub-layer with mHC mixing -----
-@@ -1821,11 +1830,30 @@ class DeepseekV4Model(nn.Module):
+@@ -1821,11 +1924,81 @@ class DeepseekV4Model(nn.Module):
          self.hc_head_base = nn.Parameter(torch.empty(hc_mult, dtype=torch.float32))
          self.hc_head_scale = nn.Parameter(torch.empty(1, dtype=torch.float32))
 
@@ -633,6 +742,57 @@ index 46cf1b0..0d84c78 100644
 +        )
 +        return logits
 +
++    def _head_tokens(self, h: torch.Tensor) -> torch.Tensor:
++        x = self.head.hc_head(
++            h, self.hc_head_fn, self.hc_head_scale, self.hc_head_base
++        )
++        return F.linear(self.norm(x).float(), self.head.weight)
++
++    def _forward_layerwise_batched(
++        self,
++        input_ids: torch.Tensor,
++        positions: torch.Tensor,
++        cu_seqlens_q: torch.Tensor,
++        cache_slots: torch.Tensor,
++        num_seqs: int,
++    ) -> torch.Tensor:
++        seq_meta: list[tuple[int, int, int, int]] = []
++        last_indices: list[int] = []
++        for seq_idx in range(num_seqs):
++            start = int(cu_seqlens_q[seq_idx].item())
++            end = int(cu_seqlens_q[seq_idx + 1].item())
++            if end <= start:
++                continue
++            seq_start = int(positions[start].item())
++            cache_slot = int(cache_slots[seq_idx].item())
++            seq_meta.append((start, end, seq_start, cache_slot))
++            last_indices.append(end - 1)
++        if not seq_meta:
++            return self._forward_one(input_ids[:1], 0, 0)
++
++        h = self.embed(input_ids)
++        h = h.unsqueeze(-2).repeat(1, self.hc_mult, 1)
++
++        for layer in self.layers:
++            residual = h
++            x, post, comb = layer.hc_pre(
++                h, layer.hc_attn_fn, layer.hc_attn_scale, layer.hc_attn_base
++            )
++            x = layer.attn_norm(x)
++            x = layer.attn.forward_batched(x, seq_meta)
++            h = layer.hc_post(x, residual, post, comb)
++
++            residual = h
++            x, post, comb = layer.hc_pre(
++                h, layer.hc_ffn_fn, layer.hc_ffn_scale, layer.hc_ffn_base
++            )
++            x = layer.ffn_norm(x)
++            x = layer.ffn(x, input_ids)
++            h = layer.hc_post(x, residual, post, comb)
++
++        last_indices_t = torch.tensor(last_indices, device=h.device, dtype=torch.long)
++        return self._head_tokens(h.index_select(0, last_indices_t))
++
      @torch.inference_mode()
      def forward(
          self,
@@ -642,7 +802,7 @@ index 46cf1b0..0d84c78 100644
          **model_kwargs: dict,
      ) -> torch.Tensor:
          """Forward.
-@@ -1844,17 +1872,51 @@ class DeepseekV4Model(nn.Module):
+@@ -1844,17 +2017,42 @@ class DeepseekV4Model(nn.Module):
                  input_ids.size(0) == 1
              ), "B>1 batched input_ids needs attn_metadata; not supported yet"
              input_ids = input_ids.flatten()
@@ -688,22 +848,13 @@ index 46cf1b0..0d84c78 100644
 +        if cache_slots is None or cache_slots.numel() < num_seqs:
 +            cache_slots = torch.arange(num_seqs, device=input_ids.device, dtype=torch.int64)
 +
-+        logits = []
-+        for seq_idx in range(num_seqs):
-+            start = int(cu_seqlens_q[seq_idx].item())
-+            end = int(cu_seqlens_q[seq_idx + 1].item())
-+            if end <= start:
-+                continue
-+            seq_start = int(positions[start].item())
-+            cache_slot = int(cache_slots[seq_idx].item())
-+            logits.append(self._forward_one(input_ids[start:end], seq_start, cache_slot))
-+        if not logits:
-+            return self._forward_one(input_ids[:1], int(start_pos), 0)
-+        return torch.cat(logits, dim=0)
++        return self._forward_layerwise_batched(
++            input_ids, positions, cu_seqlens_q, cache_slots, num_seqs
++        )
 
 
  class DeepseekV4ForCausalLM(nn.Module):
-@@ -1918,6 +1980,9 @@ class DeepseekV4ForCausalLM(nn.Module):
+@@ -1918,6 +2116,9 @@ class DeepseekV4ForCausalLM(nn.Module):
          # config lacks `quantization_config` (e.g. dummy / toy validation),
          # this still works — base spec is QuantType.No.
          self.args.quant_config = make_v4_quant_config(self.hf_config)
@@ -713,7 +864,7 @@ index 46cf1b0..0d84c78 100644
          self.model = DeepseekV4Model(args=self.args)
 
      def forward(
-@@ -1929,7 +1994,12 @@ class DeepseekV4ForCausalLM(nn.Module):
+@@ -1929,7 +2130,12 @@ class DeepseekV4ForCausalLM(nn.Module):
          **model_kwargs: dict,
      ) -> torch.Tensor:
          start_pos = int(positions[0].item()) if positions is not None else 0
@@ -868,7 +1019,11 @@ export ATOM_DSV4_SPARSE_ATTN_CHUNK_TOKENS=${ATOM_DSV4_SPARSE_ATTN_CHUNK_TOKENS:-
 # persistent DSv4 cache slot; without it, deepseek_v4.py's `kv_cache[:1]`
 # writes corrupt non-slot-0 lanes at CONC>1.
 MAX_NUM_SEQS=$(( CONC < 4 ? 4 : CONC ))
-MAX_NUM_BATCHED_TOKENS=${MAX_NUM_BATCHED_TOKENS:-$MAX_MODEL_LEN_VALUE}
+# Allow prefill batching again. The layer-wise DSv4 overlay splits attention by
+# sequence before sparse_attn, so two 8k-ish prompts no longer become one giant
+# sparse-attention problem, while MoE/FFN still sees the larger token batch.
+DEFAULT_MAX_NUM_BATCHED_TOKENS=$(( MAX_MODEL_LEN_VALUE > 16384 ? MAX_MODEL_LEN_VALUE : 16384 ))
+MAX_NUM_BATCHED_TOKENS=${MAX_NUM_BATCHED_TOKENS:-$DEFAULT_MAX_NUM_BATCHED_TOKENS}
 python3 -m atom.entrypoints.openai_server \
     --model $MODEL \
     --server-port $PORT \

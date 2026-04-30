@@ -1541,9 +1541,8 @@ dsv4-fp8-mi355x-vllm:
 # Day-0 DeepSeek-V4 on ATOM (ROCm/ATOM#650) with local runtime overlays.
 # dsv4_fp4_mi355x_atom.sh patches PR650 to give each request persistent DSv4
 # KV/compressor/indexer cache slots, unblocking CONC>1 smoke coverage. The path
-# still uses eager execution and request-looped DSv4 attention until upstream
-# lands native multi-request sparse-attention/cache support, so keep this sweep
-# conservative.
+# still uses eager execution and per-sequence sparse attention, but batches
+# attention projections, mHC, and MoE/FFN layer-by-layer across active requests.
 dsv4-fp4-mi355x-atom:
   image: rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post
   model: deepseek-ai/DeepSeek-V4-Pro
