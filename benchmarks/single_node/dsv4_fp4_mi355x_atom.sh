@@ -60,7 +60,7 @@ export AITER_LOG_LEVEL=WARNING
 #   * sunway513/aiter@e450e4d adds DSv4 FP4 MoE tuned rows that route
 #     eligible token counts to FlyDSL FP4 MoE kernels instead of default CK
 #     heuristics when the image has the optional flydsl package.
-#   * Oseltamivir/aiter@0923d27 adds DSv4 sparse MQA sink and Indexer
+#   * Oseltamivir/aiter@aa0c5b6 adds DSv4 sparse MQA sink and Indexer
 #     scorer/top-k Triton ops so ATOM can avoid the PR650 Torch fallback, plus
 #     a 4x128 sparse-attn tile that reduces repeated QK score work for D=512.
 #
@@ -84,7 +84,7 @@ if [ "${AITER_DSV4_PERF_STACK:-1}" = "1" ]; then
     AITER_DSV4_SPARSE_INDEXER=${AITER_DSV4_SPARSE_INDEXER:-1}
     AITER_DSV4_SPARSE_INDEXER_REPO=${AITER_DSV4_SPARSE_INDEXER_REPO:-https://github.com/Oseltamivir/aiter.git}
     AITER_DSV4_SPARSE_INDEXER_REF=${AITER_DSV4_SPARSE_INDEXER_REF:-dsv4-sparse-indexer-pr}
-    AITER_DSV4_SPARSE_INDEXER_SHA=${AITER_DSV4_SPARSE_INDEXER_SHA:-0923d27163ae5b722be27ea980e447fe6c3c7308}
+    AITER_DSV4_SPARSE_INDEXER_SHA=${AITER_DSV4_SPARSE_INDEXER_SHA:-aa0c5b6d97ffc6d4d11b8172dc848239f229c863}
 
     rm -rf "$AITER_PERF_DIR"
     git clone --filter=blob:none "$AITER_PERF_REPO" "$AITER_PERF_DIR"
@@ -112,7 +112,17 @@ if [ "${AITER_DSV4_PERF_STACK:-1}" = "1" ]; then
         fi
 
         if [ "$AITER_DSV4_SPARSE_INDEXER" = "1" ]; then
-            git fetch --depth=1 "$AITER_DSV4_SPARSE_INDEXER_REPO" "$AITER_DSV4_SPARSE_INDEXER_REF"
+            # Fetch the immutable commit first. The review branch is force-pushed
+            # frequently, and fetching the moving ref before checking the SHA
+            # makes old workflow runs fail before ATOM even starts.
+            if ! git fetch --depth=1 "$AITER_DSV4_SPARSE_INDEXER_REPO" "$AITER_DSV4_SPARSE_INDEXER_SHA" 2>/dev/null; then
+                git fetch --depth=1 "$AITER_DSV4_SPARSE_INDEXER_REPO" "$AITER_DSV4_SPARSE_INDEXER_REF"
+                fetched_sha="$(git rev-parse FETCH_HEAD)"
+                if [ "$fetched_sha" != "$AITER_DSV4_SPARSE_INDEXER_SHA" ]; then
+                    echo "FATAL: $AITER_DSV4_SPARSE_INDEXER_REF resolved to $fetched_sha, expected $AITER_DSV4_SPARSE_INDEXER_SHA" >&2
+                    exit 1
+                fi
+            fi
             test "$(git rev-parse FETCH_HEAD)" = "$AITER_DSV4_SPARSE_INDEXER_SHA"
             for file_path in \
                 aiter/ops/triton/_triton_kernels/attention/dsv4_indexer.py \
