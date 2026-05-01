@@ -1734,7 +1734,7 @@ dsv4-fp4-b200-sglang:
       - { tp: 8, ep: 8, dp-attn: true, conc-start: 256, conc-end: 512 }
 
 dsv4-fp4-b200-vllm:
-  image: vllm/vllm-openai:deepseekv4-cu130
+  image: vllm/vllm-openai:v0.20.0-cu130
   model: deepseek-ai/DeepSeek-V4-Pro
   model-prefix: dsv4
   runner: b200-dsv4
@@ -2000,7 +2000,7 @@ qwen3.5-bf16-b200-sglang-mtp:
       - { tp: 8, ep: 1, conc-start: 4, conc-end: 64, spec-decoding: mtp }
 
 qwen3.5-fp8-b200-sglang:
-  image: lmsysorg/sglang:v0.5.9-cu130-amd64
+  image: lmsysorg/sglang:nightly-dev-20260422-de962f32
   model: Qwen/Qwen3.5-397B-A17B-FP8
   model-prefix: qwen3.5
   runner: b200
@@ -2611,7 +2611,7 @@ dsv4-fp8-h200-vllm:
   # field, so dp-attn=true is used as the existing vLLM script switch for DP4
   # layouts on 4 allocated GPUs.
 dsv4-fp4-b300-vllm:
-  image: vllm/vllm-openai:deepseekv4-cu130
+  image: vllm/vllm-openai:v0.20.0-cu130
   model: deepseek-ai/DeepSeek-V4-Pro
   model-prefix: dsv4
   runner: b300
@@ -7798,7 +7798,7 @@ kimik2.5-fp4-gb200-dynamo-vllm:
           dp-attn: true
 
 dsv4-fp4-gb200-dynamo-vllm:
-  image: vllm/vllm-openai:deepseekv4-cu130
+  image: vllm/vllm-openai:v0.20.0-ubuntu2404
   model: deepseek-ai/DeepSeek-V4-Pro
   model-prefix: dsv4
   runner: gb200
