@@ -69,7 +69,7 @@ $EP \
 --kv-cache-dtype fp8 \
 --block-size=32 \
 --max-num-seqs $CONC \
---attention-backend "ROCM_AITER_FA" \
+--attention-backend "ROCM_AITER_UNIFIED_ATTN" \
 --trust-remote-code \
 $OFFLOAD_ARGS > "$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
