@@ -171,7 +171,7 @@ cat > srtslurm.yaml <<EOF
 # Default SLURM settings
 default_account: "${SLURM_ACCOUNT}"
 default_partition: "${SLURM_PARTITION}"
-default_time_limit: "6:00:00"
+default_time_limit: "8:00:00"
 
 # Resource defaults
 gpus_per_node: 4

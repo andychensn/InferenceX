@@ -22,6 +22,13 @@ seq_len_stoi = {
 
 MIN_EVAL_CONC = 16
 
+# Cap on concurrencies per multinode-agentic matrix entry. Each conc replays
+# DURATION (default 1800s) seconds against the same warm server, so 10 concs
+# ≈ 5h replay + ≤30 min model load + warmup overhead — fits within both the
+# slurm 8h time limit and the GHA 480-min job timeout. Topologies with longer
+# conc lists are split into ~equal chunks of <= MAX_CONCS_PER_MULTINODE_JOB.
+MAX_CONCS_PER_MULTINODE_JOB = 10
+
 # Reverse mapping for exp-name generation
 seq_len_itos = {v: k for k, v in seq_len_stoi.items()}
 
@@ -424,34 +431,42 @@ def generate_full_sweep(args, all_config_data, runner_data):
                 runners_for_entry = runner_nodes_to_use if runner_nodes_to_use else [runner]
 
                 if is_multinode:
-                    # One entry per (topology, runner) with the full conc list — the
-                    # client (agentic_srt.sh) loops over CONC_LIST and runs the trace
-                    # replay for each conc against the same already-warm server, so we
-                    # only pay the model-load cost once per topology.
-                    max_users = max(conc_values)
-                    for runner_value in runners_for_entry:
-                        entry = {
-                            Fields.IMAGE.value: image,
-                            Fields.MODEL.value: model,
-                            Fields.MODEL_PREFIX.value: model_code,
-                            Fields.PRECISION.value: precision,
-                            Fields.FRAMEWORK.value: framework,
-                            Fields.RUNNER.value: runner_value,
-                            Fields.SPEC_DECODING.value: spec_decoding,
-                            Fields.PREFILL.value: prefill,
-                            Fields.DECODE.value: decode,
-                            Fields.USERS.value: max_users,
-                            Fields.CONC.value: list(conc_values),
-                            Fields.DURATION.value: duration,
-                            Fields.EXP_NAME.value: (
-                                f"{model_code}_p{prefill[Fields.NUM_WORKER.value]}x{prefill[Fields.TP.value]}"
-                                f"_d{decode[Fields.NUM_WORKER.value]}x{decode[Fields.TP.value]}_users{max_users}"
-                            ),
-                            Fields.DISAGG.value: disagg,
-                            Fields.SCENARIO_TYPE.value: "agentic-coding",
-                        }
-                        validate_agentic_matrix_entry(entry)
-                        matrix_values.append(entry)
+                    # One entry per (topology, runner, chunk) — the client
+                    # (agentic_srt.sh) loops over CONC_LIST against the warm
+                    # server, so we only pay the model-load cost once per chunk.
+                    # Long conc lists are split into ~equal chunks of size
+                    # <= MAX_CONCS_PER_MULTINODE_JOB to fit slurm/GHA 8h limits.
+                    from math import ceil
+                    n_chunks = max(1, ceil(len(conc_values) / MAX_CONCS_PER_MULTINODE_JOB))
+                    chunk_size = ceil(len(conc_values) / n_chunks)
+                    chunks = [conc_values[i:i + chunk_size] for i in range(0, len(conc_values), chunk_size)]
+                    for chunk_idx, chunk in enumerate(chunks):
+                        max_users = max(chunk)
+                        chunk_suffix = f"_chunk{chunk_idx}" if len(chunks) > 1 else ""
+                        for runner_value in runners_for_entry:
+                            entry = {
+                                Fields.IMAGE.value: image,
+                                Fields.MODEL.value: model,
+                                Fields.MODEL_PREFIX.value: model_code,
+                                Fields.PRECISION.value: precision,
+                                Fields.FRAMEWORK.value: framework,
+                                Fields.RUNNER.value: runner_value,
+                                Fields.SPEC_DECODING.value: spec_decoding,
+                                Fields.PREFILL.value: prefill,
+                                Fields.DECODE.value: decode,
+                                Fields.USERS.value: max_users,
+                                Fields.CONC.value: list(chunk),
+                                Fields.DURATION.value: duration,
+                                Fields.EXP_NAME.value: (
+                                    f"{model_code}_p{prefill[Fields.NUM_WORKER.value]}x{prefill[Fields.TP.value]}"
+                                    f"_d{decode[Fields.NUM_WORKER.value]}x{decode[Fields.TP.value]}"
+                                    f"_users{max_users}{chunk_suffix}"
+                                ),
+                                Fields.DISAGG.value: disagg,
+                                Fields.SCENARIO_TYPE.value: "agentic-coding",
+                            }
+                            validate_agentic_matrix_entry(entry)
+                            matrix_values.append(entry)
                 else:
                     # Single-node: keep one matrix entry per concurrency since the
                     # single-node launchers spin up the server inside the same job.
