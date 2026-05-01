@@ -2046,3 +2046,10 @@
     - "Patch the DSv4 sparse_attn_v4 and Indexer paths to use the AITER kernels before falling back to the correctness-first Torch implementations"
     - "Use a dense causal Indexer fast path for 1k1k when all committed compressed entries are selected, avoiding the [S,H,T] Torch scoring tensor entirely"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1229
+
+- config-keys:
+    - dsv4-fp4-mi355x-atom
+  description:
+    - "Add TP=4 DSv4 ATOM sweep points at conc=1/2/4 for 1k1k and 8k1k"
+    - "Profile data shows TP=8 DSv4 ATOM decode/prefill is dominated by aiter cross_device_reduce kernels (~49% of GPU kernel time), so TP=4 tests whether fewer ranks reduces the communication bottleneck enough to improve per-GPU throughput"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
