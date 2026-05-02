@@ -910,13 +910,13 @@ class TestAgenticCodingSearchSpaceEntry:
         assert entry.offloading == "cpu"
 
     def test_valid_with_offloading_lmcache(self):
-        """Valid entry with offloading=lmcache should pass."""
+        """Valid entry with offloading=lmcache_cpu should pass."""
         entry = AgenticCodingSearchSpaceEntry(**{
             "tp": 2,
-            "offloading": "lmcache",
+            "offloading": "lmcache_cpu",
             "conc-list": [2, 4, 8, 16],
         })
-        assert entry.offloading == "lmcache"
+        assert entry.offloading == "lmcache_cpu"
         assert entry.tp == 2
 
     def test_valid_with_offloading_ssd(self):
@@ -950,13 +950,15 @@ class TestAgenticCodingSearchSpaceEntry:
         """Must specify either tp or both prefill and decode."""
         with pytest.raises(Exception) as exc_info:
             AgenticCodingSearchSpaceEntry(**{
-                "offloading": "lmcache",
+                "offloading": "lmcache_cpu",
                 "conc-list": [4],
             })
         assert "must specify either tp" in str(exc_info.value).lower()
 
     def test_cannot_mix_tp_and_prefill(self):
-        """Cannot specify both tp and prefill/decode."""
+        """Current validation rejects both tp and prefill/decode in the same entry.
+        Note: this tests existing behavior from PR #1201. A future PR may relax
+        this constraint to allow different prefill/decode TP values."""
         with pytest.raises(Exception):
             AgenticCodingSearchSpaceEntry(**{
                 "tp": 8,
@@ -990,16 +992,16 @@ class TestSingleNodeAgenticMatrixEntry:
             "ep": 1,
             "dp-attn": False,
             "conc": 8,
-            "offloading": "lmcache",
+            "offloading": "lmcache_cpu",
             "duration": 1800,
-            "exp-name": "minimaxm2.5_tp2_conc8_offloadlmcache",
+            "exp-name": "minimaxm2.5_tp2_conc8_offloadlmcache_cpu",
             "scenario-type": "agentic-coding",
         }
 
     def test_valid_lmcache_entry(self, valid_agentic_entry):
         """Valid agentic entry with lmcache offloading should pass."""
         entry = SingleNodeAgenticMatrixEntry(**valid_agentic_entry)
-        assert entry.offloading == "lmcache"
+        assert entry.offloading == "lmcache_cpu"
         assert entry.tp == 2
         assert entry.conc == 8
         assert entry.scenario_type == "agentic-coding"
@@ -1060,13 +1062,13 @@ class TestAgenticCodingConfig:
             "duration": 1800,
             "search-space": [
                 {"tp": 2, "offloading": "none", "conc-list": [2, 4, 8]},
-                {"tp": 2, "offloading": "lmcache", "conc-list": [2, 4, 8]},
+                {"tp": 2, "offloading": "lmcache_cpu", "conc-list": [2, 4, 8]},
             ],
         })
         assert config.duration == 1800
         assert len(config.search_space) == 2
         assert config.search_space[0].offloading == "none"
-        assert config.search_space[1].offloading == "lmcache"
+        assert config.search_space[1].offloading == "lmcache_cpu"
 
     def test_duration_defaults_to_1800(self):
         """Duration should default to 1800."""
@@ -1100,7 +1102,7 @@ class TestMasterConfigWithAgentic:
                     {
                         "duration": 1800,
                         "search-space": [
-                            {"tp": 2, "offloading": "lmcache", "conc-list": [2, 4, 8]},
+                            {"tp": 2, "offloading": "lmcache_cpu", "conc-list": [2, 4, 8]},
                         ],
                     }
                 ],
@@ -1108,7 +1110,7 @@ class TestMasterConfigWithAgentic:
         })
         assert config.scenarios.agentic_coding is not None
         assert len(config.scenarios.agentic_coding) == 1
-        assert config.scenarios.agentic_coding[0].search_space[0].offloading == "lmcache"
+        assert config.scenarios.agentic_coding[0].search_space[0].offloading == "lmcache_cpu"
 
     def test_single_node_with_both_scenarios(self):
         """Single node config with both fixed-seq-len and agentic-coding should pass."""
@@ -1132,7 +1134,7 @@ class TestMasterConfigWithAgentic:
                         "duration": 1800,
                         "search-space": [
                             {"tp": 2, "offloading": "none", "conc-list": [2, 4, 8]},
-                            {"tp": 2, "offloading": "lmcache", "conc-list": [2, 4, 8]},
+                            {"tp": 2, "offloading": "lmcache_cpu", "conc-list": [2, 4, 8]},
                         ],
                     }
                 ],

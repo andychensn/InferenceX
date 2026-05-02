@@ -64,7 +64,7 @@ case "$OFFLOADING" in
     cpu)
         OFFLOAD_ARGS="--kv_offloading_backend native --kv_offloading_size $TOTAL_CPU_DRAM_GB --disable-hybrid-kv-cache-manager"
         ;;
-    lmcache)
+    lmcache_cpu)
         # LMCache CPU DRAM offloading via LMCacheConnectorV1.
         # Critical: PYTHONHASHSEED=0 is mandatory for cache key consistency
         # across TP workers. Without it, hit rate is 0%.
@@ -78,7 +78,7 @@ case "$OFFLOADING" in
         OFFLOAD_ARGS="--kv-transfer-config {\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}"
         ;;
     *)
-        echo "Error: unsupported OFFLOADING value '$OFFLOADING' (expected one of: none, cpu, lmcache)" >&2
+        echo "Error: unsupported OFFLOADING value '$OFFLOADING' (expected one of: none, cpu, lmcache_cpu)" >&2
         exit 1
         ;;
 esac

@@ -593,9 +593,9 @@ minimaxm2.5-fp8-mi355x-vllm:
     - duration: 1800
       search-space:
       - { tp: 4, offloading: none, conc-list: [2, 4, 8, 16, 32] }
-      - { tp: 4, offloading: lmcache, conc-list: [2, 4, 8, 16, 32] }
+      - { tp: 4, offloading: lmcache_cpu, conc-list: [2, 4, 8, 16, 32] }
       - { tp: 8, offloading: none, conc-list: [2, 4, 8, 16, 32] }
-      - { tp: 8, offloading: lmcache, conc-list: [2, 4, 8, 16, 32] }
+      - { tp: 8, offloading: lmcache_cpu, conc-list: [2, 4, 8, 16, 32] }
 
 minimaxm2.5-fp8-mi355x-atom:
   image: rocm/atom:rocm7.2.1-ubuntu24.04-pytorch2.9.1-atom0.1.2
@@ -692,9 +692,9 @@ minimaxm2.5-fp8-mi300x-vllm:
     - duration: 1800
       search-space:
       - { tp: 2, offloading: none, conc-list: [2, 4, 8, 16] }
-      - { tp: 2, offloading: lmcache, conc-list: [2, 4, 8, 16] }
+      - { tp: 2, offloading: lmcache_cpu, conc-list: [2, 4, 8, 16] }
       - { tp: 8, offloading: none, conc-list: [2, 4, 8, 16, 32] }
-      - { tp: 8, offloading: lmcache, conc-list: [2, 4, 8, 16, 32] }
+      - { tp: 8, offloading: lmcache_cpu, conc-list: [2, 4, 8, 16, 32] }
 
 minimaxm2.5-fp8-mi325x-vllm:
   image: vllm/vllm-openai-rocm:v0.19.1
@@ -720,9 +720,9 @@ minimaxm2.5-fp8-mi325x-vllm:
     - duration: 1800
       search-space:
       - { tp: 2, offloading: none, conc-list: [2, 4, 8, 16] }
-      - { tp: 2, offloading: lmcache, conc-list: [2, 4, 8, 16] }
+      - { tp: 2, offloading: lmcache_cpu, conc-list: [2, 4, 8, 16] }
       - { tp: 8, offloading: none, conc-list: [2, 4, 8, 16, 32] }
-      - { tp: 8, offloading: lmcache, conc-list: [2, 4, 8, 16, 32] }
+      - { tp: 8, offloading: lmcache_cpu, conc-list: [2, 4, 8, 16, 32] }
 
 gptoss-fp4-mi300x-vllm:
   image: vllm/vllm-openai-rocm:v0.17.0
