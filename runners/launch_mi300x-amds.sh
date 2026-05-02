@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-export HF_HUB_CACHE_MOUNT="/home/gharunner/gharunners/hf-hub-cache/"
+export HF_HUB_CACHE_MOUNT="/raid/hf-hub-cache/"
 export PORT=8888
 
 PARTITION="compute"
@@ -35,6 +35,6 @@ srun --jobid=$JOB_ID \
 --container-remap-root \
 --container-workdir=/workspace/ \
 --no-container-entrypoint --export=ALL \
-bash benchmarks/single_node/${EXP_NAME%%_*}_${PRECISION}_mi300x.sh
+bash benchmarks/single_node/${SCENARIO_SUBDIR}${EXP_NAME%%_*}_${PRECISION}_mi300x.sh
 
 scancel $JOB_ID

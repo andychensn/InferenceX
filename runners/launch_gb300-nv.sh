@@ -2,9 +2,9 @@
 
 # This script sets up the environment and launches multi-node benchmarks
 
-set -x
+set -exo pipefail
 
-export SLURM_PARTITION="batch"
+export SLURM_PARTITION="batch_1"
 export SLURM_ACCOUNT="benchmark"
 export ENROOT_ROOTFS_WRITABLE=1
 
@@ -12,46 +12,77 @@ export MODEL_PATH=$MODEL
 
 if [[ $MODEL_PREFIX == "dsr1" && $PRECISION == "fp4" ]]; then
     export SERVED_MODEL_NAME="deepseek-r1-fp4"
-    export MODEL_PATH=/raid/shared/models/deepseek-r1-0528-fp4-v2
+    export MODEL_PATH=/scratch/models/DeepSeek-R1-0528-NVFP4-v2
     export SRT_SLURM_MODEL_PREFIX="dsr1"
 elif [[ $MODEL_PREFIX == "dsr1" && $PRECISION == "fp8" ]]; then
     export SERVED_MODEL_NAME="deepseek-r1-fp8"
-    export MODEL_PATH=/raid/shared/models/deepseek-r1-0528
+    export MODEL_PATH=/scratch/models/DeepSeek-R1-0528
     export SRT_SLURM_MODEL_PREFIX="dsr1-fp8"
+elif [[ $MODEL_PREFIX == "dsv4" && $PRECISION == "fp4" ]]; then
+    export MODEL_PATH=/scratch/models/DeepSeek-V4-Pro
+    export SRT_SLURM_MODEL_PREFIX="deepseek-v4-pro"
 else
-    echo "Unsupported model: $MODEL_PREFIX-$PRECISION. Supported models are: dsr1-fp4, dsr1-fp8"
+    echo "Unsupported model: $MODEL_PREFIX-$PRECISION. Supported models are: dsr1-fp4, dsr1-fp8, dsv4-fp4"
     exit 1
 fi
 
 NGINX_IMAGE="nginx:1.27.4"
 
-SQUASH_FILE="/home/sa-shared/squash/$(echo "$IMAGE" | sed 's/[\/:@#]/_/g').sqsh"
-NGINX_SQUASH_FILE="/home/sa-shared/squash/$(echo "$NGINX_IMAGE" | sed 's/[\/:@#]/_/g').sqsh"
+SQUASH_FILE="/home/sa-shared/gharunners/squash/$(echo "$IMAGE" | sed 's/[\/:@#]/_/g').sqsh"
+NGINX_SQUASH_FILE="/home/sa-shared/gharunners/squash/$(echo "$NGINX_IMAGE" | sed 's/[\/:@#]/_/g').sqsh"
 
-srun --partition=$SLURM_PARTITION --exclusive --time=180 bash -c "enroot import -o $SQUASH_FILE docker://$IMAGE"
-srun --partition=$SLURM_PARTITION --exclusive --time=180 bash -c "enroot import -o $NGINX_SQUASH_FILE docker://$NGINX_IMAGE"
+# Run the import on a compute node via srun, not on the login node:
+# the login node is x86_64 while the compute nodes are aarch64, so the
+# arm64 squash file has to be built on a compute node.
+import_squash() {
+    local squash="$1" image="$2"
+    local lock="${squash}.lock"
+    srun --partition=$SLURM_PARTITION --exclusive --time=180 bash -c "
+        exec 9>\"$lock\"
+        flock -w 600 9 || { echo 'Failed to acquire lock for $squash' >&2; exit 1; }
+        if unsquashfs -l \"$squash\" > /dev/null 2>&1; then
+            echo 'Squash file already exists and is valid, skipping import: $squash'
+        else
+            rm -f \"$squash\"
+            enroot import -o \"$squash\" docker://$image
+        fi
+    "
+}
+
+import_squash "$SQUASH_FILE" "$IMAGE"
+import_squash "$NGINX_SQUASH_FILE" "$NGINX_IMAGE"
+
+export EVAL_ONLY="${EVAL_ONLY:-false}"
 
 export ISL="$ISL"
 export OSL="$OSL"
 
 echo "Cloning srt-slurm repository..."
-SRT_REPO_DIR="srt-slurm"
-if [ -d "$SRT_REPO_DIR" ]; then
-    echo "Removing existing $SRT_REPO_DIR..."
-    rm -rf "$SRT_REPO_DIR"
-fi
+RUN_KEY=$(printf "%s" "${RESULT_FILENAME:-${RUNNER_NAME:-gb300-nv}}" | sha1sum | cut -c1-12)
+SRT_REPO_DIR="${GITHUB_WORKSPACE}/srt-slurm-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-0}-${RUN_KEY}"
+rm -rf "$SRT_REPO_DIR"
 
-git clone https://github.com/ishandhanani/srt-slurm.git "$SRT_REPO_DIR"
-cd "$SRT_REPO_DIR"
-git checkout sa-submission-q1-2026
+if [[ $FRAMEWORK == "dynamo-vllm" && $MODEL_PREFIX == "dsv4" ]]; then
+    git clone https://github.com/NVIDIA/srt-slurm.git "$SRT_REPO_DIR"
+    cd "$SRT_REPO_DIR"
+    git checkout aflowers/gb200-dsv4-recipes
+    mkdir -p recipes/vllm/deepseek-v4
+    cp -rT "$GITHUB_WORKSPACE/benchmarks/multi_node/srt-slurm-recipes/vllm/deepseek-v4" recipes/vllm/deepseek-v4
+else
+    git clone https://github.com/NVIDIA/srt-slurm.git "$SRT_REPO_DIR"
+    cd "$SRT_REPO_DIR"
+    git checkout sa-submission-q2-2026
+fi
 
 echo "Installing srtctl..."
 export UV_INSTALL_DIR="$GITHUB_WORKSPACE/.local/bin"
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$UV_INSTALL_DIR:$PATH"
 
-uv venv "$GITHUB_WORKSPACE/.venv"
-source "$GITHUB_WORKSPACE/.venv/bin/activate"
+VENV_DIR="${GITHUB_WORKSPACE}/.venv-srt-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-0}-${RUN_KEY}"
+rm -rf "$VENV_DIR"
+uv venv "$VENV_DIR"
+source "$VENV_DIR/bin/activate"
 uv pip install -e .
 
 if ! command -v srtctl &> /dev/null; then
@@ -62,7 +93,7 @@ fi
 echo "Configs available at: $SRT_REPO_DIR/"
 
 # Create srtslurm.yaml for srtctl (used by both frameworks)
-SRTCTL_ROOT="${GITHUB_WORKSPACE}/srt-slurm"
+SRTCTL_ROOT="${SRT_REPO_DIR}"
 echo "Creating srtslurm.yaml configuration..."
 cat > srtslurm.yaml <<EOF
 # SRT SLURM Configuration for GB300
@@ -95,7 +126,16 @@ cat srtslurm.yaml
 echo "Running make setup..."
 make setup ARCH=aarch64
 
+# Export eval-related env vars for srt-slurm post-benchmark eval
+export INFMAX_WORKSPACE="$GITHUB_WORKSPACE"
+
 echo "Submitting job with srtctl..."
+
+if [[ -z "$CONFIG_FILE" ]]; then
+    echo "Error: CONFIG_FILE is not set. The srt-slurm path requires a CONFIG_FILE in additional-settings." >&2
+    echo "Config: MODEL_PREFIX=${MODEL_PREFIX} PRECISION=${PRECISION} FRAMEWORK=${FRAMEWORK}" >&2
+    exit 1
+fi
 
 # Override the job name in the config file with the runner name
 sed -i "s/^name:.*/name: \"${RUNNER_NAME}\"/" "$CONFIG_FILE"
@@ -150,54 +190,77 @@ set -x
 echo "Job $JOB_ID completed!"
 echo "Collecting results..."
 
-if [ ! -d "$LOGS_DIR" ]; then
-    echo "Warning: Logs directory not found at $LOGS_DIR"
-    exit 1
-fi
-
-echo "Found logs directory: $LOGS_DIR"
-
-cp -r "$LOGS_DIR" "$GITHUB_WORKSPACE/LOGS"
-tar czf "$GITHUB_WORKSPACE/multinode_server_logs.tar.gz" -C "$LOGS_DIR" .
-
-# Find all result subdirectories
-RESULT_SUBDIRS=$(find "$LOGS_DIR" -maxdepth 1 -type d -name "*isl*osl*" 2>/dev/null)
-
-if [ -z "$RESULT_SUBDIRS" ]; then
-    echo "Warning: No result subdirectories found in $LOGS_DIR"
+if [ -d "$LOGS_DIR" ]; then
+    echo "Found logs directory: $LOGS_DIR"
+    cp -r "$LOGS_DIR" "$GITHUB_WORKSPACE/LOGS"
+    tar czf "$GITHUB_WORKSPACE/multinode_server_logs.tar.gz" -C "$LOGS_DIR" .
 else
-    # Process results from all configurations
-    for result_subdir in $RESULT_SUBDIRS; do
-        echo "Processing result subdirectory: $result_subdir"
-
-        # Extract configuration info from directory name
-        CONFIG_NAME=$(basename "$result_subdir")
-
-        # Find all result JSON files
-        RESULT_FILES=$(find "$result_subdir" -name "results_concurrency_*.json" 2>/dev/null)
-
-        for result_file in $RESULT_FILES; do
-            if [ -f "$result_file" ]; then
-                # Extract metadata from filename
-                # Files are of the format "results_concurrency_gpus_{num gpus}_ctx_{num ctx}_gen_{num gen}.json"
-                filename=$(basename "$result_file")
-                concurrency=$(echo "$filename" | sed -n 's/results_concurrency_\([0-9]*\)_gpus_.*/\1/p')
-                gpus=$(echo "$filename" | sed -n 's/results_concurrency_[0-9]*_gpus_\([0-9]*\)_ctx_.*/\1/p')
-                ctx=$(echo "$filename" | sed -n 's/.*_ctx_\([0-9]*\)_gen_.*/\1/p')
-                gen=$(echo "$filename" | sed -n 's/.*_gen_\([0-9]*\)\.json/\1/p')
-
-                echo "Processing concurrency $concurrency with $gpus GPUs (ctx: $ctx, gen: $gen): $result_file"
-
-                WORKSPACE_RESULT_FILE="$GITHUB_WORKSPACE/${RESULT_FILENAME}_${CONFIG_NAME}_conc${concurrency}_gpus_${gpus}_ctx_${ctx}_gen_${gen}.json"
-                cp "$result_file" "$WORKSPACE_RESULT_FILE"
-
-                echo "Copied result file to: $WORKSPACE_RESULT_FILE"
-            fi
-        done
-    done
+    echo "Warning: Logs directory not found at $LOGS_DIR"
 fi
 
-echo "All result files processed"
+if [[ "${EVAL_ONLY:-false}" != "true" ]]; then
+    if [ ! -d "$LOGS_DIR" ]; then
+        exit 1
+    fi
+
+    # Find all result subdirectories
+    RESULT_SUBDIRS=$(find "$LOGS_DIR" -maxdepth 1 -type d -name "*isl*osl*" 2>/dev/null)
+
+    if [ -z "$RESULT_SUBDIRS" ]; then
+        echo "Warning: No result subdirectories found in $LOGS_DIR"
+    else
+        # Process results from all configurations
+        for result_subdir in $RESULT_SUBDIRS; do
+            echo "Processing result subdirectory: $result_subdir"
+
+            # Extract configuration info from directory name
+            CONFIG_NAME=$(basename "$result_subdir")
+
+            # Find all result JSON files
+            RESULT_FILES=$(find "$result_subdir" -name "results_concurrency_*.json" 2>/dev/null)
+
+            for result_file in $RESULT_FILES; do
+                if [ -f "$result_file" ]; then
+                    # Extract metadata from filename
+                    # Files are of the format "results_concurrency_gpus_{num gpus}_ctx_{num ctx}_gen_{num gen}.json"
+                    filename=$(basename "$result_file")
+                    concurrency=$(echo "$filename" | sed -n 's/results_concurrency_\([0-9]*\)_gpus_.*/\1/p')
+                    gpus=$(echo "$filename" | sed -n 's/results_concurrency_[0-9]*_gpus_\([0-9]*\)_ctx_.*/\1/p')
+                    ctx=$(echo "$filename" | sed -n 's/.*_ctx_\([0-9]*\)_gen_.*/\1/p')
+                    gen=$(echo "$filename" | sed -n 's/.*_gen_\([0-9]*\)\.json/\1/p')
+
+                    echo "Processing concurrency $concurrency with $gpus GPUs (ctx: $ctx, gen: $gen): $result_file"
+
+                    WORKSPACE_RESULT_FILE="$GITHUB_WORKSPACE/${RESULT_FILENAME}_${CONFIG_NAME}_conc${concurrency}_gpus_${gpus}_ctx_${ctx}_gen_${gen}.json"
+                    cp "$result_file" "$WORKSPACE_RESULT_FILE"
+
+                    echo "Copied result file to: $WORKSPACE_RESULT_FILE"
+                fi
+            done
+        done
+    fi
+
+    echo "All result files processed"
+else
+    echo "EVAL_ONLY=true: Skipping benchmark result collection"
+fi
+
+# Collect eval results if eval was requested
+if [[ "${RUN_EVAL:-false}" == "true" || "${EVAL_ONLY:-false}" == "true" ]]; then
+    EVAL_DIR="$LOGS_DIR/eval_results"
+    if [ -d "$EVAL_DIR" ]; then
+        echo "Extracting eval results from $EVAL_DIR"
+        shopt -s nullglob
+        for eval_file in "$EVAL_DIR"/*; do
+            [ -f "$eval_file" ] || continue
+            cp "$eval_file" "$GITHUB_WORKSPACE/"
+            echo "Copied eval artifact: $(basename "$eval_file")"
+        done
+        shopt -u nullglob
+    else
+        echo "WARNING: RUN_EVAL=true but no eval results found at $EVAL_DIR"
+    fi
+fi
 
 # Clean up srt-slurm outputs to prevent NFS silly-rename lock files
 # from blocking the next job's checkout on this runner

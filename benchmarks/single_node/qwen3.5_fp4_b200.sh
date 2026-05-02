@@ -23,33 +23,35 @@ hf download "$MODEL"
 SERVER_LOG=/workspace/server.log
 PORT=${PORT:-8888}
 
-echo "EP_SIZE: $EP_SIZE, CONC: $CONC, ISL: $ISL, OSL: $OSL"
-
-EVAL_CONTEXT_ARGS=""
+CONTEXT_LENGTH=$((ISL + OSL + 20))
 if [ "${EVAL_ONLY}" = "true" ]; then
     setup_eval_context
-    EVAL_CONTEXT_ARGS="--context-length $EVAL_MAX_MODEL_LEN"
+    CONTEXT_LENGTH="$EVAL_MAX_MODEL_LEN"
 fi
+
 # Start GPU monitoring (power, temperature, clocks every second)
 start_gpu_monitor
-
-# following https://huggingface.co/nvidia/GLM-5-NVFP4#usage recipe
-# except using latest nightly at the time of writing
-# since the recommended nightly image in that recipe doesn't exist.
 
 set -x
 PYTHONNOUSERSITE=1 python3 -m sglang.launch_server --model-path=$MODEL --host=0.0.0.0 --port=$PORT \
 --trust-remote-code \
---tensor-parallel-size=$TP \
---data-parallel-size 1 --expert-parallel-size 1 \
---tool-call-parser glm47 \
---reasoning-parser glm45 \
+--tensor-parallel-size=$TP --data-parallel-size=1 --expert-parallel-size=$EP_SIZE \
+--enable-symm-mem \
+--disable-radix-cache \
 --quantization modelopt_fp4 \
---cuda-graph-max-bs $CONC --max-running-requests $CONC \
---mem-fraction-static 0.80 \
---chunked-prefill-size 131072 \
---stream-interval 30 \
---model-loader-extra-config '{"enable_multithread_load": true}' $EVAL_CONTEXT_ARGS > $SERVER_LOG 2>&1 &
+--kv-cache-dtype fp8_e4m3 \
+--mamba-ssm-dtype bfloat16 \
+--attention-backend trtllm_mha \
+--moe-runner-backend flashinfer_trtllm \
+--cuda-graph-max-bs $CONC \
+--max-prefill-tokens 16384 \
+--chunked-prefill-size 16384 \
+--mem-fraction-static 0.8 \
+--stream-interval 50 \
+--scheduler-recv-interval $( [[ $CONC -gt 4 ]] && echo 30 || echo 10 ) \
+--tokenizer-worker-num 6 \
+--tokenizer-path $MODEL \
+--context-length $CONTEXT_LENGTH > $SERVER_LOG 2>&1 &
 
 SERVER_PID=$!
 
