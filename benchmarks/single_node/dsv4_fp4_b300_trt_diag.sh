@@ -11,7 +11,8 @@
 #   4. FP8 KV cache with CUDA graph disabled.
 #   5. num_postprocess_workers=1 for postprocess/scatter race isolation.
 #   6. TP/EP/DPA topology controls.
-#   7. Explicit KV dtype controls if the branch accepts them.
+#   7. MHC fused-HC disabled with TRTLLM_MHC_ENABLE_FUSED_HC=0.
+#   8. Explicit KV dtype controls if the branch accepts them.
 #
 # Each live server gets a queued probe batch that records local prompt token IDs,
 # decoded prompts with and without special tokens, one-token/logprob probes, and
@@ -258,6 +259,7 @@ padding_lines = int(os.environ.get("TRTLLM_DSV4_DIAG_PADDING_LINES", "550"))
 probe_workers = int(os.environ.get("TRTLLM_DSV4_DIAG_PROBE_WORKERS", "4"))
 completion_logprobs = int(os.environ.get("TRTLLM_DSV4_DIAG_COMPLETION_LOGPROBS", "20"))
 chat_top_logprobs = int(os.environ.get("TRTLLM_DSV4_DIAG_CHAT_TOP_LOGPROBS", "20"))
+repeat_count = int(os.environ.get("TRTLLM_DSV4_DIAG_REPEAT_COUNT", "10"))
 
 bench_utils = Path.cwd() / "utils" / "bench_serving"
 if bench_utils.exists():
@@ -394,6 +396,30 @@ probes = [
         "content": long_prefill_math,
     },
 ]
+
+for repeat_idx in range(repeat_count):
+    probes.extend([
+        {
+            "name": f"repeat_tiny_completion_1tok_{repeat_idx:02d}",
+            "endpoint": "completion",
+            "expected": None,
+            "max_tokens": 1,
+            "content": "2+2=",
+            "diagnostic_only": True,
+            "repeat_group": "tiny_completion_1tok",
+            "repeat_index": repeat_idx,
+        },
+        {
+            "name": f"repeat_tiny_completion_4tok_{repeat_idx:02d}",
+            "endpoint": "completion",
+            "expected": None,
+            "max_tokens": 4,
+            "content": "2+2=",
+            "diagnostic_only": True,
+            "repeat_group": "tiny_completion_4tok",
+            "repeat_index": repeat_idx,
+        },
+    ])
 
 def exact_final_number(text: str, expected: int) -> bool:
     text = (text or "").strip()
@@ -546,6 +572,64 @@ def summarize_body(body: dict) -> dict:
             summary["choice"]["text_repr"] = repr(choice.get("text"))
     return summary
 
+def build_repeat_summary(results: list[dict]) -> dict:
+    grouped = {}
+    for result in results:
+        group = result.get("repeat_group")
+        if not group:
+            continue
+        entry = grouped.setdefault(group, {
+            "count": 0,
+            "unique_outputs": {},
+            "first_token_counts": {},
+            "request_ids": [],
+            "samples": [],
+        })
+        entry["count"] += 1
+        raw = result.get("raw") or result.get("reasoning_raw") or ""
+        entry["unique_outputs"][raw] = entry["unique_outputs"].get(raw, 0) + 1
+        output_ids = (
+            result.get("output_analysis", {}).get("token_ids_head")
+            if isinstance(result.get("output_analysis"), dict)
+            else []
+        ) or []
+        first_token_id = output_ids[0] if output_ids else None
+        first_token_key = str(first_token_id)
+        entry["first_token_counts"][first_token_key] = (
+            entry["first_token_counts"].get(first_token_key, 0) + 1
+        )
+        response_id = result.get("response_summary", {}).get("id")
+        if response_id:
+            entry["request_ids"].append(response_id)
+        if len(entry["samples"]) < 5:
+            entry["samples"].append({
+                "name": result.get("name"),
+                "raw_repr": result.get("raw_repr"),
+                "finish_reason": result.get("finish_reason"),
+                "usage": result.get("usage"),
+                "response_id": response_id,
+                "output_token_ids_head": output_ids[:16],
+                "top_logprobs_head": (
+                    result.get("response_summary", {})
+                    .get("choice", {})
+                    .get("logprobs", {})
+                    .get("top_logprobs_head")
+                    if isinstance(
+                        result.get("response_summary", {})
+                        .get("choice", {})
+                        .get("logprobs"),
+                        dict,
+                    )
+                    else None
+                ),
+            })
+    for group, entry in grouped.items():
+        entry["num_unique_outputs"] = len(entry["unique_outputs"])
+        entry["num_unique_first_tokens"] = len(entry["first_token_counts"])
+        entry["deterministic_output"] = entry["num_unique_outputs"] <= 1
+        entry["deterministic_first_token"] = entry["num_unique_first_tokens"] <= 1
+    return grouped
+
 def post_json(path: str, payload: dict) -> dict:
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -642,6 +726,8 @@ def run_one_probe(probe: dict) -> dict:
             "request_endpoint": request_endpoint,
             "expected": expected,
             "diagnostic_only": bool(probe.get("diagnostic_only", False)),
+            "repeat_group": probe.get("repeat_group"),
+            "repeat_index": probe.get("repeat_index"),
             "expected_found": exact_ok,
             "exact_final_answer": exact_ok,
             "prompt_preview": prompt[:500],
@@ -664,6 +750,8 @@ def run_one_probe(probe: dict) -> dict:
             "endpoint": probe["endpoint"],
             "expected": probe.get("expected"),
             "diagnostic_only": bool(probe.get("diagnostic_only", False)),
+            "repeat_group": probe.get("repeat_group"),
+            "repeat_index": probe.get("repeat_index"),
             "expected_found": False,
             "exact_final_answer": False,
             "prompt_analysis": analyze_text("raw_user_content", probe.get("content") or ""),
@@ -723,6 +811,8 @@ summary = {
     "ok_count": ok_count,
     "num_probes": len(probes),
     "probe_workers": probe_workers,
+    "repeat_count": repeat_count,
+    "repeat_summary": build_repeat_summary(results),
     "completion_ok": completion_ok,
     "nontrivial_completion_ok": nontrivial_completion_ok,
     "chat_ok": chat_ok,
@@ -768,16 +858,22 @@ run_variant() {
     local variant_ep_size="${8:-$EP_SIZE}"
     local variant_dp_attention="${9:-$DP_ATTENTION}"
     local postprocess_workers="${10:-4}"
+    local mhc_fused_hc="${11:-}"
     local config_file="dsv4-fp4-trt-${variant}.yml"
     local variant_log="/tmp/dsv4_trt_${variant}_server.log"
     local probe_json="/tmp/dsv4_trt_${variant}_probe.json"
     local server_pid=""
     local ready=0
     local probe_status=1
+    local serve_env=()
 
     log
     log "===== TRTLLM DSV4 DIAGNOSTIC VARIANT: $variant ====="
-    log "kv_dtype=$kv_dtype cuda_graph=$graph_mode moe_backend=$moe_backend autotuner=$autotuner tp=$variant_tp ep_size=$variant_ep_size dp_attention=$variant_dp_attention num_postprocess_workers=$postprocess_workers port=$port"
+    log "kv_dtype=$kv_dtype cuda_graph=$graph_mode moe_backend=$moe_backend autotuner=$autotuner tp=$variant_tp ep_size=$variant_ep_size dp_attention=$variant_dp_attention num_postprocess_workers=$postprocess_workers mhc_fused_hc=${mhc_fused_hc:-unset} port=$port"
+
+    if [[ -n "$mhc_fused_hc" ]]; then
+        serve_env+=(TRTLLM_MHC_ENABLE_FUSED_HC="$mhc_fused_hc")
+    fi
 
     write_config "$config_file" "$kv_dtype" "$graph_mode" "$moe_backend" "$autotuner" "$variant_dp_attention" "$postprocess_workers"
     log "Generated config $config_file:"
@@ -800,9 +896,10 @@ run_variant() {
     )
 
     if [[ "${TRTLLM_DSV4_USE_MPIRUN:-1}" == "0" ]]; then
-        "${SERVE_CMD[@]}" > "$variant_log" 2>&1 &
+        env "${serve_env[@]}" "${SERVE_CMD[@]}" > "$variant_log" 2>&1 &
     else
         mpirun -n 1 --oversubscribe --allow-run-as-root \
+            env "${serve_env[@]}" \
             "${SERVE_CMD[@]}" \
             > "$variant_log" 2>&1 &
     fi
@@ -834,7 +931,7 @@ run_variant() {
         hadamard_missing=1
     fi
 
-    python3 - "$variant" "$kv_dtype" "$graph_mode" "$moe_backend" "$autotuner" "$variant_tp" "$variant_ep_size" "$variant_dp_attention" "$postprocess_workers" "$ready" "$probe_status" "$kvcache_nan" "$hadamard_missing" "$probe_json" "$DIAG_JSONL" "$variant_log" <<'PY'
+    python3 - "$variant" "$kv_dtype" "$graph_mode" "$moe_backend" "$autotuner" "$variant_tp" "$variant_ep_size" "$variant_dp_attention" "$postprocess_workers" "$mhc_fused_hc" "$ready" "$probe_status" "$kvcache_nan" "$hadamard_missing" "$probe_json" "$DIAG_JSONL" "$variant_log" <<'PY'
 import json
 import os
 import re
@@ -845,13 +942,14 @@ moe_backend, autotuner = sys.argv[4], sys.argv[5]
 variant_tp, variant_ep_size = sys.argv[6], sys.argv[7]
 variant_dp_attention = sys.argv[8]
 postprocess_workers = sys.argv[9]
-ready = bool(int(sys.argv[10]))
-probe_status = int(sys.argv[11])
-kvcache_nan = bool(int(sys.argv[12]))
-hadamard_missing = bool(int(sys.argv[13]))
-probe_json = sys.argv[14]
-diag_jsonl = sys.argv[15]
-variant_log = sys.argv[16]
+mhc_fused_hc = sys.argv[10]
+ready = bool(int(sys.argv[11]))
+probe_status = int(sys.argv[12])
+kvcache_nan = bool(int(sys.argv[13]))
+hadamard_missing = bool(int(sys.argv[14]))
+probe_json = sys.argv[15]
+diag_jsonl = sys.argv[16]
+variant_log = sys.argv[17]
 
 probe = {}
 if os.path.exists(probe_json):
@@ -885,6 +983,7 @@ row = {
     "ep_size": variant_ep_size,
     "dp_attention": variant_dp_attention == "true",
     "num_postprocess_workers": int(postprocess_workers),
+    "mhc_fused_hc": mhc_fused_hc if mhc_fused_hc else None,
     "ready": ready,
     "probe_status": probe_status,
     "probe_ok": bool(probe.get("ok", False)),
@@ -995,6 +1094,7 @@ run_variant "auto_kv_graph" "unset" "on" "$((PORT_BASE + 1))" "TRTLLM" "default"
 run_variant "auto_kv_no_autotune" "unset" "on" "$((PORT_BASE + 2))" "TRTLLM" "false" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
 run_variant "auto_kv_vanilla_moe" "unset" "on" "$((PORT_BASE + 3))" "VANILLA" "false" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
 run_variant "fp8_no_cuda_graph" "fp8" "off" "$((PORT_BASE + 4))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
+run_variant "fp8_graph_mhc_fused_hc_off" "fp8" "on" "$((PORT_BASE + 10))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4" "0"
 
 if [[ "${TRTLLM_DSV4_DIAG_ENABLE_PP1:-1}" == "1" ]]; then
     run_variant "baseline_fp8_graph_pp1" "fp8" "on" "$((PORT_BASE + 5))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "1"
@@ -1008,8 +1108,8 @@ if [[ "${TRTLLM_DSV4_DIAG_ENABLE_TP_EP_MATRIX:-1}" == "1" ]]; then
 fi
 
 if [[ "${TRTLLM_DSV4_DIAG_ENABLE_EXPLICIT_KV_DTYPES:-1}" == "1" ]]; then
-    run_variant "bf16_kv_graph" "bf16" "on" "$((PORT_BASE + 10))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
-    run_variant "default_kv_graph" "default" "on" "$((PORT_BASE + 11))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
+    run_variant "bfloat16_kv_graph" "bfloat16" "on" "$((PORT_BASE + 11))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
+    run_variant "torch_bfloat16_kv_graph" "torch.bfloat16" "on" "$((PORT_BASE + 12))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
 fi
 
 stop_gpu_monitor
@@ -1030,6 +1130,7 @@ by_name = {row["variant"]: row for row in rows}
 baseline = by_name.get("baseline_fp8_graph", {})
 auto_kv = by_name.get("auto_kv_graph", {})
 no_graph = by_name.get("fp8_no_cuda_graph", {})
+mhc_off = by_name.get("fp8_graph_mhc_fused_hc_off", {})
 no_autotune = by_name.get("auto_kv_no_autotune", {})
 vanilla_moe = by_name.get("auto_kv_vanilla_moe", {})
 baseline_pp1 = by_name.get("baseline_fp8_graph_pp1", {})
@@ -1037,8 +1138,8 @@ auto_kv_pp1 = by_name.get("auto_kv_graph_pp1", {})
 tp4_ep1 = by_name.get("tp4_ep1_dpa_false_fp8_graph", {})
 tp8_ep8_dpa = by_name.get("tp8_ep8_dpa_true_fp8_graph", {})
 tp4_ep4_dpa = by_name.get("tp4_ep4_dpa_true_fp8_graph", {})
-bf16_kv = by_name.get("bf16_kv_graph", {})
-default_kv = by_name.get("default_kv_graph", {})
+bfloat16_kv = by_name.get("bfloat16_kv_graph", {})
+torch_bfloat16_kv = by_name.get("torch_bfloat16_kv_graph", {})
 
 endpoint_split_variants = [
     row["variant"] for row in rows if row.get("endpoint_split_suspect")
@@ -1066,13 +1167,14 @@ summary = {
     "auto_kv_no_autotune_ok": bool(no_autotune.get("probe_ok", False)),
     "auto_kv_vanilla_moe_ok": bool(vanilla_moe.get("probe_ok", False)),
     "fp8_no_cuda_graph_ok": bool(no_graph.get("probe_ok", False)),
+    "fp8_graph_mhc_fused_hc_off_ok": bool(mhc_off.get("probe_ok", False)),
     "baseline_pp1_ok": bool(baseline_pp1.get("probe_ok", False)),
     "auto_kv_pp1_ok": bool(auto_kv_pp1.get("probe_ok", False)),
     "tp4_ep1_dpa_false_ok": bool(tp4_ep1.get("probe_ok", False)),
     "tp8_ep8_dpa_true_ok": bool(tp8_ep8_dpa.get("probe_ok", False)),
     "tp4_ep4_dpa_true_ok": bool(tp4_ep4_dpa.get("probe_ok", False)),
-    "bf16_kv_ok": bool(bf16_kv.get("probe_ok", False)),
-    "default_kv_ok": bool(default_kv.get("probe_ok", False)),
+    "bfloat16_kv_ok": bool(bfloat16_kv.get("probe_ok", False)),
+    "torch_bfloat16_kv_ok": bool(torch_bfloat16_kv.get("probe_ok", False)),
     "completion_ok_variants": completion_ok_variants,
     "nontrivial_completion_ok_variants": nontrivial_completion_ok_variants,
     "dsv4_template_completion_ok_variants": dsv4_template_completion_ok_variants,
@@ -1092,6 +1194,9 @@ summary = {
     "supports_cuda_graph_stale_metadata_suspect": (
         baseline.get("probe_ok") is False and no_graph.get("probe_ok") is True
     ),
+    "supports_mhc_fused_hc_suspect": (
+        baseline.get("probe_ok") is False and mhc_off.get("probe_ok") is True
+    ),
     "supports_postprocess_worker_race_suspect": (
         baseline.get("probe_ok") is False and baseline_pp1.get("probe_ok") is True
     ),
@@ -1106,11 +1211,11 @@ summary = {
         baseline.get("completion_ok") is True
         and baseline.get("hf_template_completion_ok") is False
     ),
-    "supports_explicit_bf16_kv_suspect": (
-        baseline.get("probe_ok") is False and bf16_kv.get("probe_ok") is True
+    "supports_explicit_bfloat16_kv_suspect": (
+        baseline.get("probe_ok") is False and bfloat16_kv.get("probe_ok") is True
     ),
-    "supports_explicit_default_kv_suspect": (
-        baseline.get("probe_ok") is False and default_kv.get("probe_ok") is True
+    "supports_explicit_torch_bfloat16_kv_suspect": (
+        baseline.get("probe_ok") is False and torch_bfloat16_kv.get("probe_ok") is True
     ),
     "any_variant_ok": any(row.get("probe_ok") for row in rows),
     "any_completion_ok": any(row.get("completion_ok") for row in rows),
