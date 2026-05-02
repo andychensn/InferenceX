@@ -30,6 +30,51 @@ PORT=${PORT:-8888}
 export OMP_NUM_THREADS=1
 export AITER_LOG_LEVEL=WARNING
 
+# Keep the runtime overlay narrow: this benchmark uses the updated ATOM image
+# from amd-master.yaml and overlays ROCm/aiter#2998 for the DSv4 kernels. Install
+# AITER before ATOM because the ATOM fork imports dsv4_indexer_topk at module load.
+if [ "${AITER_DSV4_PR2998:-1}" = "1" ]; then
+    AITER_PR2998_REPO=${AITER_PR2998_REPO:-https://github.com/ROCm/aiter.git}
+    AITER_PR2998_REF=${AITER_PR2998_REF:-pull/2998/head}
+    AITER_PR2998_SHA=${AITER_PR2998_SHA:-aa0c5b6d97ffc6d4d11b8172dc848239f229c863}
+    AITER_PR2998_DIR=${AITER_PR2998_DIR:-/tmp/aiter-dsv4-pr2998}
+
+    rm -rf "$AITER_PR2998_DIR"
+    git clone --filter=blob:none "$AITER_PR2998_REPO" "$AITER_PR2998_DIR"
+    (
+        cd "$AITER_PR2998_DIR"
+        git fetch --depth=1 origin "$AITER_PR2998_REF"
+        fetched_sha="$(git rev-parse FETCH_HEAD)"
+        if [ "$fetched_sha" != "$AITER_PR2998_SHA" ]; then
+            echo "FATAL: $AITER_PR2998_REF resolved to $fetched_sha, expected $AITER_PR2998_SHA" >&2
+            exit 1
+        fi
+        git checkout --force FETCH_HEAD
+
+        if [ ! -d 3rdparty/composable_kernel/include ]; then
+            git submodule update --init --recursive --depth=1 3rdparty/composable_kernel \
+                || git submodule update --init --recursive 3rdparty/composable_kernel
+        fi
+
+        PREBUILD_KERNELS=${AITER_PREBUILD_KERNELS:-0} \
+        python3 -m pip install --no-deps --no-build-isolation --force-reinstall -e .
+    )
+
+    python3 - <<'PYEOF'
+import inspect
+from aiter.ops.triton.attention.dsv4_indexer import dsv4_indexer_topk
+from aiter.ops.triton.attention.sparse_mqa_sink import sparse_mqa_sink
+
+indexer_params = inspect.signature(dsv4_indexer_topk).parameters
+missing = [name for name in ("seq_ids", "kv_lens") if name not in indexer_params]
+if missing:
+    raise SystemExit(f"FATAL: AITER PR2998 DSv4 Indexer API missing {missing}")
+print("AITER PR2998 DSv4 sparse/indexer ops imported successfully")
+PYEOF
+else
+    echo "WARN: AITER_DSV4_PR2998=0; using image-provided AITER"
+fi
+
 # The updated ATOM image still does not ship DeepSeek-V4 model registration.
 # Overlay the ATOM branch stacked on ROCm/ATOM#650 that wires the DSv4 Indexer
 # path to ROCm/aiter#2998.
@@ -179,51 +224,6 @@ print("ATOM DSv4 architecture registration and AITER Indexer wiring imported suc
 PYEOF
 else
     echo "WARN: ATOM_DSV4_PR650=0; using image-provided ATOM"
-fi
-
-# Keep the runtime overlay narrow: this benchmark uses the updated ATOM image
-# from amd-master.yaml and overlays ROCm/aiter#2998 for the DSv4 kernels. The
-# ATOM overlay above currently consumes its Indexer top-k path.
-if [ "${AITER_DSV4_PR2998:-1}" = "1" ]; then
-    AITER_PR2998_REPO=${AITER_PR2998_REPO:-https://github.com/ROCm/aiter.git}
-    AITER_PR2998_REF=${AITER_PR2998_REF:-pull/2998/head}
-    AITER_PR2998_SHA=${AITER_PR2998_SHA:-aa0c5b6d97ffc6d4d11b8172dc848239f229c863}
-    AITER_PR2998_DIR=${AITER_PR2998_DIR:-/tmp/aiter-dsv4-pr2998}
-
-    rm -rf "$AITER_PR2998_DIR"
-    git clone --filter=blob:none "$AITER_PR2998_REPO" "$AITER_PR2998_DIR"
-    (
-        cd "$AITER_PR2998_DIR"
-        git fetch --depth=1 origin "$AITER_PR2998_REF"
-        fetched_sha="$(git rev-parse FETCH_HEAD)"
-        if [ "$fetched_sha" != "$AITER_PR2998_SHA" ]; then
-            echo "FATAL: $AITER_PR2998_REF resolved to $fetched_sha, expected $AITER_PR2998_SHA" >&2
-            exit 1
-        fi
-        git checkout --force FETCH_HEAD
-
-        if [ ! -d 3rdparty/composable_kernel/include ]; then
-            git submodule update --init --recursive --depth=1 3rdparty/composable_kernel \
-                || git submodule update --init --recursive 3rdparty/composable_kernel
-        fi
-
-        PREBUILD_KERNELS=${AITER_PREBUILD_KERNELS:-0} \
-        python3 -m pip install --no-deps --no-build-isolation --force-reinstall -e .
-    )
-
-    python3 - <<'PYEOF'
-import inspect
-from aiter.ops.triton.attention.dsv4_indexer import dsv4_indexer_topk
-from aiter.ops.triton.attention.sparse_mqa_sink import sparse_mqa_sink
-
-indexer_params = inspect.signature(dsv4_indexer_topk).parameters
-missing = [name for name in ("seq_ids", "kv_lens") if name not in indexer_params]
-if missing:
-    raise SystemExit(f"FATAL: AITER PR2998 DSv4 Indexer API missing {missing}")
-print("AITER PR2998 DSv4 sparse/indexer ops imported successfully")
-PYEOF
-else
-    echo "WARN: AITER_DSV4_PR2998=0; using image-provided AITER"
 fi
 
 # DSv4-Pro advertises a 1M native context. Set the benchmark context
