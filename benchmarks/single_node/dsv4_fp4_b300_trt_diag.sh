@@ -2,13 +2,15 @@
 
 # Temporary B300/TRTLLM DeepSeek-V4 diagnostic.
 #
-# This isolates the current garbage-output failure by installing the optional
-# fast Hadamard transform dependency and comparing the baseline path against
-# targeted config ablations:
+# This isolates the current garbage-output failure by checking completion vs
+# chat endpoint behavior with strict final-answer scoring, then comparing the
+# baseline path against targeted config/topology ablations:
 #   1. Default/auto KV cache, same CUDA graph config.
 #   2. Auto KV cache with TRTLLM autotuner disabled.
 #   3. Auto KV cache with the vanilla MoE backend.
 #   4. FP8 KV cache with CUDA graph disabled.
+#   5. num_postprocess_workers=1 for postprocess/scatter race isolation.
+#   6. TP/EP/DPA topology controls.
 #
 # The runner routes only the representative B300 DeepSeek-V4 TRT job here.
 
@@ -77,6 +79,17 @@ write_config() {
     local graph_mode="$3"
     local moe_backend="$4"
     local autotuner="$5"
+    local dp_attention="$6"
+    local postprocess_workers="$7"
+
+    local attention_dp_config=""
+    if [[ "$dp_attention" == "true" ]]; then
+        attention_dp_config="
+attention_dp_config:
+    batching_wait_iters: 0
+    enable_balance: true
+    timeout_iters: 60"
+    fi
 
     {
         if [[ "$graph_mode" == "on" ]]; then
@@ -96,7 +109,7 @@ EOF
         fi
 
         cat <<EOF
-enable_attention_dp: $DP_ATTENTION
+enable_attention_dp: $dp_attention$attention_dp_config
 print_iter_log: true
 kv_cache_config:
     tokens_per_block: 128
@@ -108,7 +121,7 @@ EOF
     free_gpu_memory_fraction: $KV_CACHE_FREE_MEM_FRACTION
     enable_block_reuse: false
 stream_interval: 10
-num_postprocess_workers: 4
+num_postprocess_workers: $postprocess_workers
 moe_config:
     backend: $moe_backend
 EOF
@@ -148,13 +161,19 @@ eval_result = {
         }
     },
     "versions": {"gsm8k": 0},
-    "config": {"note": "temporary TRTLLM DeepSeek-V4 B300 diagnostic result"},
+    "config": {
+        "note": "temporary TRTLLM DeepSeek-V4 B300 diagnostic placeholder; inspect dsv4_trt_b300_diag_summary.json for probe results"
+    },
 }
 with open("results_dsv4_trt_b300_diag.json", "w") as f:
     json.dump(eval_result, f, indent=2)
 
 with open("meta_env.json", "w") as f:
-    json.dump({"diagnostic": "dsv4_trt_b300", "pass_metric": pass_metric}, f, indent=2)
+    json.dump({
+        "diagnostic": "dsv4_trt_b300",
+        "placeholder_eval_metric": pass_metric,
+        "summary_json": "dsv4_trt_b300_diag_summary.json",
+    }, f, indent=2)
 PY
 }
 
@@ -238,21 +257,35 @@ probes = [
     {
         "name": "tiny_completion",
         "endpoint": "completion",
-        "expected": r"(?<!\d)4(?!\d)",
+        "expected": 4,
         "max_tokens": 4,
         "content": "2+2=",
     },
     {
-        "name": "short_math",
-        "endpoint": "chat",
-        "expected": r"(?<!\d)4(?!\d)",
+        "name": "short_math_completion",
+        "endpoint": "completion",
+        "expected": 4,
         "max_tokens": 96,
         "content": "Answer with the final integer only. What is 2 + 2?",
     },
     {
-        "name": "gsm8k_like",
+        "name": "short_math_chat",
         "endpoint": "chat",
-        "expected": r"(?<!\d)8(?!\d)",
+        "expected": 4,
+        "max_tokens": 96,
+        "content": "Answer with the final integer only. What is 2 + 2?",
+    },
+    {
+        "name": "short_math_hf_template_completion",
+        "endpoint": "hf_template_completion",
+        "expected": 4,
+        "max_tokens": 96,
+        "content": "Answer with the final integer only. What is 2 + 2?",
+    },
+    {
+        "name": "gsm8k_like_chat",
+        "endpoint": "chat",
+        "expected": 8,
         "max_tokens": 96,
         "content": (
             "Answer math word problems. Put the final answer as #### <number>.\n\n"
@@ -265,9 +298,24 @@ probes = [
         ),
     },
     {
-        "name": "long_prefill_math",
+        "name": "gsm8k_like_hf_template_completion",
+        "endpoint": "hf_template_completion",
+        "expected": 8,
+        "max_tokens": 96,
+        "content": (
+            "Answer math word problems. Put the final answer as #### <number>.\n\n"
+            "Q: Sarah has 3 boxes with 4 pencils in each box. How many pencils does she have?\n"
+            "A: Sarah has 3 * 4 = 12 pencils. #### 12\n\n"
+            "Q: A store had 20 oranges and sold 7. How many oranges remain?\n"
+            "A: The store has 20 - 7 = 13 oranges left. #### 13\n\n"
+            "Q: James has 6 apples, buys 7 more, and gives away 5. How many apples does James have left?\n"
+            "A:"
+        ),
+    },
+    {
+        "name": "long_prefill_math_chat",
         "endpoint": "chat",
-        "expected": r"(?<!\d)8(?!\d)",
+        "expected": 8,
         "max_tokens": 96,
         "content": (
             filler
@@ -276,6 +324,68 @@ probes = [
         ),
     },
 ]
+
+def exact_final_number(text: str, expected: int) -> bool:
+    text = (text or "").strip()
+    match = re.search(r"(?<![\d.])(?:####\s*)?(-?\d+(?:\.0+)?)\s*$", text)
+    if not match:
+        return False
+    try:
+        return float(match.group(1)) == float(expected)
+    except ValueError:
+        return False
+
+def token_list(value):
+    if hasattr(value, "tolist"):
+        value = value.tolist()
+    if isinstance(value, list) and value and isinstance(value[0], list):
+        value = value[0]
+    return list(value or [])
+
+tokenizer = None
+tokenizer_info = {"model": model}
+try:
+    from transformers import AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
+    template_messages = [
+        {"role": "user", "content": "Answer with the final integer only. What is 2 + 2?"}
+    ]
+    rendered = tokenizer.apply_chat_template(
+        template_messages,
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+    token_ids = token_list(tokenizer.apply_chat_template(
+        template_messages,
+        tokenize=True,
+        add_generation_prompt=True,
+    ))
+    tokenizer_info.update({
+        "loaded": True,
+        "class": type(tokenizer).__name__,
+        "chat_template_preview": (getattr(tokenizer, "chat_template", None) or "")[:1000],
+        "rendered_short_math_prompt_repr": repr(rendered),
+        "rendered_short_math_prompt_preview": rendered[:1000],
+        "rendered_short_math_token_count": len(token_ids),
+        "rendered_short_math_token_ids_head": token_ids[:80],
+        "rendered_short_math_token_ids_tail": token_ids[-80:],
+        "eos_token": getattr(tokenizer, "eos_token", None),
+        "eos_token_id": getattr(tokenizer, "eos_token_id", None),
+        "pad_token": getattr(tokenizer, "pad_token", None),
+        "pad_token_id": getattr(tokenizer, "pad_token_id", None),
+    })
+except Exception as exc:
+    tokenizer_info.update({"loaded": False, "error": repr(exc)})
+
+def render_hf_chat_prompt(content: str) -> str:
+    if tokenizer is None:
+        raise RuntimeError(f"HF tokenizer unavailable: {tokenizer_info.get('error')}")
+    return tokenizer.apply_chat_template(
+        [{"role": "user", "content": content}],
+        tokenize=False,
+        add_generation_prompt=True,
+    )
 
 def post_json(path: str, payload: dict) -> dict:
     data = json.dumps(payload).encode("utf-8")
@@ -318,32 +428,78 @@ for probe in probes:
     try:
         if probe["endpoint"] == "completion":
             text, usage, finish_reason = complete_text(probe["content"], probe["max_tokens"])
-        else:
+            prompt_preview = probe["content"][:500]
+        elif probe["endpoint"] == "hf_template_completion":
+            rendered_prompt = render_hf_chat_prompt(probe["content"])
+            text, usage, finish_reason = complete_text(rendered_prompt, probe["max_tokens"])
+            prompt_preview = rendered_prompt[:500]
+        elif probe["endpoint"] == "chat":
             text, usage, finish_reason = complete_chat(probe["content"], probe["max_tokens"])
-        expected_found = re.search(probe["expected"], text) is not None
-        ok_count += int(expected_found)
+            prompt_preview = probe["content"][:500]
+        else:
+            raise RuntimeError(f"unknown endpoint type {probe['endpoint']}")
+        exact_ok = exact_final_number(text, probe["expected"])
+        ok_count += int(exact_ok)
         results.append({
             "name": probe["name"],
             "endpoint": probe["endpoint"],
-            "expected_found": expected_found,
+            "expected": probe["expected"],
+            "expected_found": exact_ok,
+            "exact_final_answer": exact_ok,
+            "prompt_preview": prompt_preview,
             "usage": usage,
             "finish_reason": finish_reason,
             "raw": text,
             "raw_preview": text[:500],
         })
-    except (urllib.error.URLError, TimeoutError, KeyError, json.JSONDecodeError) as exc:
+    except Exception as exc:
         results.append({
             "name": probe["name"],
             "endpoint": probe["endpoint"],
+            "expected": probe["expected"],
             "expected_found": False,
+            "exact_final_answer": False,
             "error": repr(exc),
         })
 
+by_name = {result["name"]: result for result in results}
+def probe_ok(name: str) -> bool:
+    return bool(by_name.get(name, {}).get("exact_final_answer", False))
+
+tiny_completion_ok = probe_ok("tiny_completion")
+short_completion_ok = probe_ok("short_math_completion")
+short_chat_ok = probe_ok("short_math_chat")
+gsm8k_chat_ok = probe_ok("gsm8k_like_chat")
+short_hf_template_completion_ok = probe_ok("short_math_hf_template_completion")
+gsm8k_hf_template_completion_ok = probe_ok("gsm8k_like_hf_template_completion")
+long_prefill_chat_ok = probe_ok("long_prefill_math_chat")
+
+completion_ok = tiny_completion_ok and short_completion_ok
+chat_ok = short_chat_ok and gsm8k_chat_ok
+hf_template_completion_ok = (
+    short_hf_template_completion_ok and gsm8k_hf_template_completion_ok
+)
+
 summary = {
     "variant": variant,
-    "ok": ok_count >= 2,
+    "ok": tiny_completion_ok and chat_ok,
     "ok_count": ok_count,
     "num_probes": len(probes),
+    "completion_ok": completion_ok,
+    "chat_ok": chat_ok,
+    "hf_template_completion_ok": hf_template_completion_ok,
+    "endpoint_split_suspect": completion_ok and not chat_ok,
+    "long_prefill_chat_ok": long_prefill_chat_ok,
+    "required_probe_status": {
+        "tiny_completion_ok": tiny_completion_ok,
+        "short_completion_ok": short_completion_ok,
+        "short_chat_ok": short_chat_ok,
+        "gsm8k_chat_ok": gsm8k_chat_ok,
+        "short_hf_template_completion_ok": short_hf_template_completion_ok,
+        "gsm8k_hf_template_completion_ok": gsm8k_hf_template_completion_ok,
+        "long_prefill_chat_ok": long_prefill_chat_ok,
+    },
+    "tokenizer": tokenizer_info,
     "probes": results,
 }
 
@@ -362,6 +518,10 @@ run_variant() {
     local port="$4"
     local moe_backend="$5"
     local autotuner="$6"
+    local variant_tp="${7:-$TP}"
+    local variant_ep_size="${8:-$EP_SIZE}"
+    local variant_dp_attention="${9:-$DP_ATTENTION}"
+    local postprocess_workers="${10:-4}"
     local config_file="dsv4-fp4-trt-${variant}.yml"
     local variant_log="/tmp/dsv4_trt_${variant}_server.log"
     local probe_json="/tmp/dsv4_trt_${variant}_probe.json"
@@ -371,9 +531,9 @@ run_variant() {
 
     log
     log "===== TRTLLM DSV4 DIAGNOSTIC VARIANT: $variant ====="
-    log "kv_dtype=$kv_dtype cuda_graph=$graph_mode moe_backend=$moe_backend autotuner=$autotuner port=$port"
+    log "kv_dtype=$kv_dtype cuda_graph=$graph_mode moe_backend=$moe_backend autotuner=$autotuner tp=$variant_tp ep_size=$variant_ep_size dp_attention=$variant_dp_attention num_postprocess_workers=$postprocess_workers port=$port"
 
-    write_config "$config_file" "$kv_dtype" "$graph_mode" "$moe_backend" "$autotuner"
+    write_config "$config_file" "$kv_dtype" "$graph_mode" "$moe_backend" "$autotuner" "$variant_dp_attention" "$postprocess_workers"
     log "Generated config $config_file:"
     sed 's/^/[config] /' "$config_file" | tee -a "$SERVER_LOG"
 
@@ -386,8 +546,8 @@ run_variant() {
         --max_batch_size "$MAX_BATCH_SIZE"
         --max_seq_len "$DIAG_MAX_MODEL_LEN"
         --max_num_tokens "$DIAG_MAX_NUM_TOKENS"
-        --tp_size "$TP"
-        --ep_size "$EP_SIZE"
+        --tp_size "$variant_tp"
+        --ep_size "$variant_ep_size"
         --custom_tokenizer deepseek_v4
         --config "$config_file"
     )
@@ -427,19 +587,22 @@ run_variant() {
         hadamard_missing=1
     fi
 
-    python3 - "$variant" "$kv_dtype" "$graph_mode" "$moe_backend" "$autotuner" "$ready" "$probe_status" "$kvcache_nan" "$hadamard_missing" "$probe_json" "$DIAG_JSONL" <<'PY'
+    python3 - "$variant" "$kv_dtype" "$graph_mode" "$moe_backend" "$autotuner" "$variant_tp" "$variant_ep_size" "$variant_dp_attention" "$postprocess_workers" "$ready" "$probe_status" "$kvcache_nan" "$hadamard_missing" "$probe_json" "$DIAG_JSONL" <<'PY'
 import json
 import os
 import sys
 
 variant, kv_dtype, graph_mode = sys.argv[1], sys.argv[2], sys.argv[3]
 moe_backend, autotuner = sys.argv[4], sys.argv[5]
-ready = bool(int(sys.argv[6]))
-probe_status = int(sys.argv[7])
-kvcache_nan = bool(int(sys.argv[8]))
-hadamard_missing = bool(int(sys.argv[9]))
-probe_json = sys.argv[10]
-diag_jsonl = sys.argv[11]
+variant_tp, variant_ep_size = sys.argv[6], sys.argv[7]
+variant_dp_attention = sys.argv[8]
+postprocess_workers = sys.argv[9]
+ready = bool(int(sys.argv[10]))
+probe_status = int(sys.argv[11])
+kvcache_nan = bool(int(sys.argv[12]))
+hadamard_missing = bool(int(sys.argv[13]))
+probe_json = sys.argv[14]
+diag_jsonl = sys.argv[15]
 
 probe = {}
 if os.path.exists(probe_json):
@@ -452,10 +615,19 @@ row = {
     "cuda_graph": graph_mode,
     "moe_backend": moe_backend,
     "autotuner": autotuner,
+    "tp": variant_tp,
+    "ep_size": variant_ep_size,
+    "dp_attention": variant_dp_attention == "true",
+    "num_postprocess_workers": int(postprocess_workers),
     "ready": ready,
     "probe_status": probe_status,
     "probe_ok": bool(probe.get("ok", False)),
     "ok_count": probe.get("ok_count", 0),
+    "completion_ok": bool(probe.get("completion_ok", False)),
+    "chat_ok": bool(probe.get("chat_ok", False)),
+    "hf_template_completion_ok": bool(probe.get("hf_template_completion_ok", False)),
+    "endpoint_split_suspect": bool(probe.get("endpoint_split_suspect", False)),
+    "long_prefill_chat_ok": bool(probe.get("long_prefill_chat_ok", False)),
     "kvcache_nan_or_inf_warning": kvcache_nan,
     "hadamard_missing_or_skipped_warning": hadamard_missing,
     "probe": probe,
@@ -531,11 +703,22 @@ PY
 start_gpu_monitor --output "$PWD/gpu_metrics.csv"
 trap 'stop_gpu_monitor' EXIT
 
-run_variant "baseline_fp8_graph" "fp8" "on" "$PORT_BASE" "TRTLLM" "default"
-run_variant "auto_kv_graph" "unset" "on" "$((PORT_BASE + 1))" "TRTLLM" "default"
-run_variant "auto_kv_no_autotune" "unset" "on" "$((PORT_BASE + 2))" "TRTLLM" "false"
-run_variant "auto_kv_vanilla_moe" "unset" "on" "$((PORT_BASE + 3))" "VANILLA" "false"
-run_variant "fp8_no_cuda_graph" "fp8" "off" "$((PORT_BASE + 4))" "TRTLLM" "default"
+run_variant "baseline_fp8_graph" "fp8" "on" "$PORT_BASE" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
+run_variant "auto_kv_graph" "unset" "on" "$((PORT_BASE + 1))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
+run_variant "auto_kv_no_autotune" "unset" "on" "$((PORT_BASE + 2))" "TRTLLM" "false" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
+run_variant "auto_kv_vanilla_moe" "unset" "on" "$((PORT_BASE + 3))" "VANILLA" "false" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
+run_variant "fp8_no_cuda_graph" "fp8" "off" "$((PORT_BASE + 4))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "4"
+
+if [[ "${TRTLLM_DSV4_DIAG_ENABLE_PP1:-1}" == "1" ]]; then
+    run_variant "baseline_fp8_graph_pp1" "fp8" "on" "$((PORT_BASE + 5))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "1"
+    run_variant "auto_kv_graph_pp1" "unset" "on" "$((PORT_BASE + 6))" "TRTLLM" "default" "$TP" "$EP_SIZE" "$DP_ATTENTION" "1"
+fi
+
+if [[ "${TRTLLM_DSV4_DIAG_ENABLE_TP_EP_MATRIX:-1}" == "1" ]]; then
+    run_variant "tp4_ep1_dpa_false_fp8_graph" "fp8" "on" "$((PORT_BASE + 7))" "TRTLLM" "default" "4" "1" "false" "4"
+    run_variant "tp8_ep8_dpa_true_fp8_graph" "fp8" "on" "$((PORT_BASE + 8))" "TRTLLM" "default" "8" "8" "true" "4"
+    run_variant "tp4_ep4_dpa_true_fp8_graph" "fp8" "on" "$((PORT_BASE + 9))" "TRTLLM" "default" "4" "4" "true" "4"
+fi
 
 stop_gpu_monitor
 trap - EXIT
@@ -557,14 +740,38 @@ auto_kv = by_name.get("auto_kv_graph", {})
 no_graph = by_name.get("fp8_no_cuda_graph", {})
 no_autotune = by_name.get("auto_kv_no_autotune", {})
 vanilla_moe = by_name.get("auto_kv_vanilla_moe", {})
+baseline_pp1 = by_name.get("baseline_fp8_graph_pp1", {})
+auto_kv_pp1 = by_name.get("auto_kv_graph_pp1", {})
+tp4_ep1 = by_name.get("tp4_ep1_dpa_false_fp8_graph", {})
+tp8_ep8_dpa = by_name.get("tp8_ep8_dpa_true_fp8_graph", {})
+tp4_ep4_dpa = by_name.get("tp4_ep4_dpa_true_fp8_graph", {})
+
+endpoint_split_variants = [
+    row["variant"] for row in rows if row.get("endpoint_split_suspect")
+]
+chat_ok_variants = [row["variant"] for row in rows if row.get("chat_ok")]
+completion_ok_variants = [
+    row["variant"] for row in rows if row.get("completion_ok")
+]
 
 summary = {
     "variants": rows,
     "baseline_ok": bool(baseline.get("probe_ok", False)),
+    "baseline_completion_ok": bool(baseline.get("completion_ok", False)),
+    "baseline_chat_ok": bool(baseline.get("chat_ok", False)),
+    "baseline_hf_template_completion_ok": bool(baseline.get("hf_template_completion_ok", False)),
     "auto_kv_ok": bool(auto_kv.get("probe_ok", False)),
     "auto_kv_no_autotune_ok": bool(no_autotune.get("probe_ok", False)),
     "auto_kv_vanilla_moe_ok": bool(vanilla_moe.get("probe_ok", False)),
     "fp8_no_cuda_graph_ok": bool(no_graph.get("probe_ok", False)),
+    "baseline_pp1_ok": bool(baseline_pp1.get("probe_ok", False)),
+    "auto_kv_pp1_ok": bool(auto_kv_pp1.get("probe_ok", False)),
+    "tp4_ep1_dpa_false_ok": bool(tp4_ep1.get("probe_ok", False)),
+    "tp8_ep8_dpa_true_ok": bool(tp8_ep8_dpa.get("probe_ok", False)),
+    "tp4_ep4_dpa_true_ok": bool(tp4_ep4_dpa.get("probe_ok", False)),
+    "completion_ok_variants": completion_ok_variants,
+    "chat_ok_variants": chat_ok_variants,
+    "endpoint_split_variants": endpoint_split_variants,
     "supports_explicit_fp8_override_suspect": (
         baseline.get("probe_ok") is False and auto_kv.get("probe_ok") is True
     ),
@@ -577,7 +784,24 @@ summary = {
     "supports_cuda_graph_stale_metadata_suspect": (
         baseline.get("probe_ok") is False and no_graph.get("probe_ok") is True
     ),
+    "supports_postprocess_worker_race_suspect": (
+        baseline.get("probe_ok") is False and baseline_pp1.get("probe_ok") is True
+    ),
+    "supports_tp_ep_topology_suspect": (
+        baseline.get("probe_ok") is False
+        and any(row.get("probe_ok") for row in [tp4_ep1, tp8_ep8_dpa, tp4_ep4_dpa])
+    ),
+    "supports_chat_endpoint_or_serialization_suspect": bool(
+        baseline.get("endpoint_split_suspect", False)
+    ),
+    "supports_hf_template_mismatch_suspect": (
+        baseline.get("completion_ok") is True
+        and baseline.get("hf_template_completion_ok") is False
+    ),
     "any_variant_ok": any(row.get("probe_ok") for row in rows),
+    "any_completion_ok": any(row.get("completion_ok") for row in rows),
+    "any_chat_ok": any(row.get("chat_ok") for row in rows),
+    "any_endpoint_split_suspect": bool(endpoint_split_variants),
     "any_kvcache_nan_warning": any(row.get("kvcache_nan_or_inf_warning") for row in rows),
     "any_hadamard_warning": any(row.get("hadamard_missing_or_skipped_warning") for row in rows),
 }
@@ -590,15 +814,16 @@ print(json.dumps(summary, indent=2, ensure_ascii=False))
 print("===== END TRTLLM DSV4 DIAGNOSTIC SUMMARY =====")
 PY
 
-pass_metric="$(python3 - "$DIAG_SUMMARY_JSON" <<'PY'
+strict_any_ok="$(python3 - "$DIAG_SUMMARY_JSON" <<'PY'
 import json
 import sys
 
 with open(sys.argv[1]) as f:
     summary = json.load(f)
-print("1.0" if summary.get("any_variant_ok") else "0.0")
+print("1" if summary.get("any_variant_ok") else "0")
 PY
 )"
+pass_metric="0.0"
 write_placeholder_outputs "$pass_metric"
 
 if [[ "${TRTLLM_DSV4_DIAG_FAIL_AFTER:-1}" == "1" ]]; then
@@ -606,7 +831,7 @@ if [[ "${TRTLLM_DSV4_DIAG_FAIL_AFTER:-1}" == "1" ]]; then
     exit 1
 fi
 
-if [[ "$pass_metric" == "1.0" ]]; then
+if [[ "$strict_any_ok" == "1" ]]; then
     exit 0
 fi
 
