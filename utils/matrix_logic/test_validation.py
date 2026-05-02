@@ -953,23 +953,47 @@ class TestAgenticCodingSearchSpaceEntry:
                 "offloading": "lmcache_cpu",
                 "conc-list": [4],
             })
-        assert "must specify either tp" in str(exc_info.value).lower()
+        assert "must specify at least tp" in str(exc_info.value).lower()
 
-    def test_cannot_mix_tp_and_prefill(self):
-        """Current validation rejects both tp and prefill/decode in the same entry.
-        Note: this tests existing behavior from PR #1201. A future PR may relax
-        this constraint to allow different prefill/decode TP values."""
-        with pytest.raises(Exception):
+    def test_tp_with_prefill_decode_allowed(self):
+        """tp can coexist with prefill/decode for disaggregated serving."""
+        entry = AgenticCodingSearchSpaceEntry(**{
+            "tp": 8,
+            "prefill": {
+                "num-worker": 1, "tp": 4, "ep": 4, "dp-attn": False,
+            },
+            "decode": {
+                "num-worker": 1, "tp": 8, "ep": 8, "dp-attn": False,
+            },
+            "conc-list": [4],
+        })
+        assert entry.tp == 8
+        assert entry.prefill.tp == 4
+        assert entry.decode.tp == 8
+
+    def test_prefill_without_decode_rejected(self):
+        """Specifying only prefill without decode should fail."""
+        with pytest.raises(Exception) as exc_info:
             AgenticCodingSearchSpaceEntry(**{
                 "tp": 8,
                 "prefill": {
                     "num-worker": 1, "tp": 4, "ep": 4, "dp-attn": False,
                 },
+                "conc-list": [4],
+            })
+        assert "both prefill and decode" in str(exc_info.value).lower()
+
+    def test_decode_without_prefill_rejected(self):
+        """Specifying only decode without prefill should fail."""
+        with pytest.raises(Exception) as exc_info:
+            AgenticCodingSearchSpaceEntry(**{
+                "tp": 8,
                 "decode": {
                     "num-worker": 1, "tp": 8, "ep": 8, "dp-attn": False,
                 },
                 "conc-list": [4],
             })
+        assert "both prefill and decode" in str(exc_info.value).lower()
 
 
 # =============================================================================

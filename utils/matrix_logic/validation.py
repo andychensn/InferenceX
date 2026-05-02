@@ -349,15 +349,13 @@ class AgenticCodingSearchSpaceEntry(BaseModel):
 
     @model_validator(mode='after')
     def validate_topology_fields(self):
-        has_single_node = self.tp is not None
-        has_any_multinode_field = self.prefill is not None or self.decode is not None
-        has_complete_multinode = self.prefill is not None and self.decode is not None
-        if has_single_node:
-            valid = not has_any_multinode_field
-        else:
-            valid = has_complete_multinode
-        if not valid:
-            raise ValueError("Agentic search-space entries must specify either tp or both prefill and decode")
+        has_tp = self.tp is not None
+        has_prefill = self.prefill is not None
+        has_decode = self.decode is not None
+        if has_prefill != has_decode:
+            raise ValueError("Agentic search-space entries must specify both prefill and decode, not just one")
+        if not has_tp and not has_prefill:
+            raise ValueError("Agentic search-space entries must specify at least tp or both prefill and decode")
         return self
 
 
