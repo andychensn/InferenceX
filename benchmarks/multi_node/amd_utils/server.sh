@@ -543,8 +543,10 @@ if [ "$NODE_RANK" -eq 0 ]; then
                 export EVAL_CONCURRENT_REQUESTS=$(echo "$BENCH_MAX_CONCURRENCY" | tr 'x' '\n' | sort -n | tail -1)
             fi
 
-            # Use larger context length for eval to accommodate R1 thinking chains
-            export EVAL_MAX_MODEL_LEN=16384
+            # Override eval context length with model's configured context_length
+            if [[ -n "$prefill_context_length" ]]; then
+                export EVAL_MAX_MODEL_LEN="$prefill_context_length"
+            fi
 
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 echo "DRY RUN: run_eval --framework lm-eval --port 30000 (conc=${EVAL_CONCURRENT_REQUESTS}, ctx=${EVAL_MAX_MODEL_LEN:-auto})"
