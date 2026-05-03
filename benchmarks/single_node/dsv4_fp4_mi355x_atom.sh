@@ -63,6 +63,9 @@ if [ "${AITER_DSV4_PR2998:-1}" = "1" ]; then
 
     python3 - <<'PYEOF'
 import inspect
+import ast
+from pathlib import Path
+import aiter.ops.topk as topk_module
 from aiter.ops.topk import top_k_per_row_decode, top_k_per_row_prefill
 from aiter.ops.triton.attention.dsv4_indexer import dsv4_indexer_topk
 from aiter.ops.triton.attention.sparse_mqa_sink import sparse_mqa_sink
@@ -82,9 +85,18 @@ indexer_params = inspect.signature(dsv4_indexer_topk).parameters
 missing = [name for name in ("seq_ids", "kv_lens") if name not in indexer_params]
 if missing:
     raise SystemExit(f"FATAL: AITER PR2998 DSv4 Indexer API missing {missing}")
-for fn in (top_k_per_row_decode, top_k_per_row_prefill):
-    if "k" not in inspect.signature(fn).parameters:
-        raise SystemExit(f"FATAL: AITER {fn.__name__} is missing dynamic k parameter")
+topk_tree = ast.parse(Path(topk_module.__file__).read_text())
+topk_defs = {
+    node.name: node for node in topk_tree.body if isinstance(node, ast.FunctionDef)
+}
+missing_k = [
+    name
+    for name in ("top_k_per_row_decode", "top_k_per_row_prefill")
+    if name not in topk_defs
+    or not any(arg.arg == "k" for arg in topk_defs[name].args.args)
+]
+if missing_k:
+    raise SystemExit(f"FATAL: AITER top-k wrappers missing dynamic k parameter: {missing_k}")
 print("AITER PR2998 DSv4 sparse/top-k/indexer ops imported successfully")
 PYEOF
 else
