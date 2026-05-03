@@ -341,17 +341,9 @@ fi
 if [[ "${EVAL_ONLY:-false}" == "true" ]] || [[ "${RUN_EVAL:-false}" == "true" ]]; then
     PREFILL_SERVER_CONFIG=$(echo "$PREFILL_SERVER_CONFIG" | sed 's/--ep-dispatch-algorithm fake//g')
     DECODE_SERVER_CONFIG=$(echo "$DECODE_SERVER_CONFIG" | sed 's/--ep-dispatch-algorithm fake//g')
-
-    if [[ "$DECODE_ENABLE_DP" != "true" ]] && [[ "$DECODE_MTP_SIZE" -gt 0 ]]; then
-        DECODE_SERVER_CONFIG=$(echo "$DECODE_SERVER_CONFIG" | sed 's/--speculative-num-steps [0-9]*/--speculative-num-steps 3/; s/--speculative-num-draft-tokens [0-9]*/--speculative-num-draft-tokens 4/')
-    fi
-
-    # Increase context-length for eval to accommodate R1 thinking chains
-    PREFILL_SERVER_CONFIG=$(echo "$PREFILL_SERVER_CONFIG" | sed 's/--context-length [0-9]*/--context-length 16384/')
-
     unset MORI_MOE_MAX_INPUT_TOKENS_PREFILL
     unset MORI_MOE_MAX_INPUT_TOKENS_DECODE
-    unset SGLANG_MORI_FP8_COMB
+
 fi
 
 # =============================================================================
@@ -702,7 +694,7 @@ else
         DECODE_MORI_MOE_ENV="SGLANG_MORI_MOE_MAX_INPUT_TOKENS=${MORI_MOE_MAX_INPUT_TOKENS_DECODE}"
     fi
     set +x
-    DECODE_CMD="${DECODE_MORI_MOE_ENV} SGLANG_MORI_NUM_MAX_DISPATCH_TOKENS_PER_RANK=${MORI_MAX_DISPATCH_TOKENS_DECODE} python3 -m sglang.launch_server \
+    DECODE_CMD="${DECODE_MORI_MOE_ENV} SGLANG_MORI_FP8_COMB=false SGLANG_MORI_NUM_MAX_DISPATCH_TOKENS_PER_RANK=${MORI_MAX_DISPATCH_TOKENS_DECODE} python3 -m sglang.launch_server \
         --model-path ${MODEL_DIR}/${MODEL_NAME} \
         --disaggregation-mode decode \
         --disaggregation-ib-device ${IBDEVICES} \

@@ -1427,7 +1427,7 @@ dsr1-fp4-mi355x-sglang-disagg-mtp:
           dp-attn: false
           additional-settings:
           - "DECODE_NODES=2"
-          - "DECODE_MTP_SIZE=1"
+          - "DECODE_MTP_SIZE=2"
 
       # 1P2D TP4
       - spec-decoding: "mtp" 
@@ -1446,7 +1446,7 @@ dsr1-fp4-mi355x-sglang-disagg-mtp:
           dp-attn: false
           additional-settings:
           - "DECODE_NODES=2"
-          - "DECODE_MTP_SIZE=1"
+          - "DECODE_MTP_SIZE=2"
 
       # 1*DEP4+ 1*DEP8
       - spec-decoding: "mtp"
@@ -1528,7 +1528,7 @@ dsr1-fp4-mi355x-sglang-disagg-mtp:
           dp-attn: false
           additional-settings:
           - "DECODE_NODES=2"
-          - "DECODE_MTP_SIZE=1"
+          - "DECODE_MTP_SIZE=2"
 
       # 1P2D TP4
       - spec-decoding: "mtp"
@@ -1547,7 +1547,7 @@ dsr1-fp4-mi355x-sglang-disagg-mtp:
           dp-attn: false
           additional-settings:
           - "DECODE_NODES=2"
-          - "DECODE_MTP_SIZE=1"
+          - "DECODE_MTP_SIZE=2"
 
       # 2*DEP8 + 1*DEP8
       - spec-decoding: "mtp"
