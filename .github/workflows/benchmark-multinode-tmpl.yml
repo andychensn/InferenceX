@@ -171,6 +171,33 @@ jobs:
             done
           fi
 
+      - name: Free stale NFS locks in workspace (pre-checkout)
+        run: |
+          # GHA's actions/checkout uses `clean: true` which `rm -rf`'s the
+          # workspace. NFS-mounted home dirs hold deleted-but-still-open
+          # files as `.nfs<hex>` until the holder closes them — so an
+          # orphaned `tail -F` left over from a previous launcher run blocks
+          # the cleanup with EBUSY and the whole job fails before any of
+          # our code runs. Find any process with an open file under this
+          # workspace and SIGKILL it before checkout, then evaporate any
+          # leftover .nfs* turds. Best-effort — silent when nothing's stuck.
+          set +e
+          ws="${{ github.workspace }}"
+          if [ -d "$ws" ] && command -v fuser >/dev/null 2>&1; then
+            echo "[nfs-clean] killing any process holding files under $ws"
+            fuser -k -SIGKILL -m "$ws" 2>/dev/null || true
+            sleep 2
+          fi
+          # Belt-and-suspenders: also kill anything that looks like a
+          # leftover sweep / benchmark tail across the runner host.
+          pkill -KILL -f 'tail -[fF].*sweep_[0-9]+' 2>/dev/null || true
+          pkill -KILL -f 'tail -[fF].*benchmark\.out' 2>/dev/null || true
+          if [ -d "$ws" ]; then
+            find "$ws" -name '.nfs*' -print -delete 2>/dev/null || true
+          fi
+          set -e
+          echo "[nfs-clean] done"
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           token: ${{ secrets.REPO_PAT }}

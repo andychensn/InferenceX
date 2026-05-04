@@ -431,18 +431,11 @@ def generate_full_sweep(args, all_config_data, runner_data):
                 runners_for_entry = runner_nodes_to_use if runner_nodes_to_use else [runner]
 
                 if is_multinode:
-                    # One entry per (topology, runner, chunk) — the client
-                    # (agentic_srt.sh) loops over CONC_LIST against the warm
-                    # server, so we only pay the model-load cost once per chunk.
-                    # Long conc lists are split into ~equal chunks of size
-                    # <= MAX_CONCS_PER_MULTINODE_JOB to fit slurm/GHA 8h limits.
-                    from math import ceil
-                    n_chunks = max(1, ceil(len(conc_values) / MAX_CONCS_PER_MULTINODE_JOB))
-                    chunk_size = ceil(len(conc_values) / n_chunks)
-                    chunks = [conc_values[i:i + chunk_size] for i in range(0, len(conc_values), chunk_size)]
-                    for chunk_idx, chunk in enumerate(chunks):
-                        max_users = max(chunk)
-                        chunk_suffix = f"_chunk{chunk_idx}" if len(chunks) > 1 else ""
+                    # One entry per (topology, conc, runner) — match the
+                    # single-node fan-out so each conc is its own GHA job.
+                    # Trades cold-start model-load tax per conc for far easier
+                    # debuggability when something dies mid-sweep.
+                    for users in conc_values:
                         for runner_value in runners_for_entry:
                             entry = {
                                 Fields.IMAGE.value: image,
@@ -454,13 +447,13 @@ def generate_full_sweep(args, all_config_data, runner_data):
                                 Fields.SPEC_DECODING.value: spec_decoding,
                                 Fields.PREFILL.value: prefill,
                                 Fields.DECODE.value: decode,
-                                Fields.USERS.value: max_users,
-                                Fields.CONC.value: list(chunk),
+                                Fields.USERS.value: users,
+                                Fields.CONC.value: [users],
                                 Fields.DURATION.value: duration,
                                 Fields.EXP_NAME.value: (
                                     f"{model_code}_p{prefill[Fields.NUM_WORKER.value]}x{prefill[Fields.TP.value]}"
                                     f"_d{decode[Fields.NUM_WORKER.value]}x{decode[Fields.TP.value]}"
-                                    f"_users{max_users}{chunk_suffix}"
+                                    f"_users{users}"
                                 ),
                                 Fields.DISAGG.value: disagg,
                                 Fields.SCENARIO_TYPE.value: "agentic-coding",
