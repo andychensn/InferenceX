@@ -83,6 +83,8 @@ vllm serve "$MODEL" \
 --tool-call-parser deepseek_v4 \
 --enable-auto-tool-choice \
 --reasoning-parser deepseek_v4 \
+--enable-prefix-caching \
+--no-disable-hybrid-kv-cache-manager \
 --max-model-len "$MAX_MODEL_LEN" \
 --max-num-seqs "$CONC" \
 $OFFLOAD_ARGS > "$SERVER_LOG" 2>&1 &
