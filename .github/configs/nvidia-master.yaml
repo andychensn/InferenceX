@@ -1768,12 +1768,10 @@ dsv4-fp4-b200-vllm:
     agentic-coding:
     - duration: 1800
       search-space:
-      # Pure TP=8 — high interactivity, single engine, attention sharded
-      # across all 8 GPUs. Lower TPOT, smaller batch.
-      - { tp: 8, offloading: none, conc-list: [1, 2, 4, 8, 16, 32] }
+      # cpu offload only this iteration — none entries already validated in
+      # earlier runs (B200 25332045030: TP=8 1..32 + DEP=8 16..128 all 100%).
+      # Re-add when investigating regressions in offload=none.
       - { tp: 8, offloading: cpu,  conc-list: [16, 32, 64] }
-      # DEP=8 — high throughput per blog recipe, DP=8 attention with EP=8 MoE.
-      - { tp: 8, ep: 8, dp-attn: true, offloading: none, conc-list: [16, 32, 64, 128] }
       - { tp: 8, ep: 8, dp-attn: true, offloading: cpu,  conc-list: [64, 128, 256] }
 
 # NOTE: At the time of submission, https://cookbook.sglang.io/autoregressive/DeepSeek/DeepSeek-R1
@@ -2730,17 +2728,11 @@ dsv4-fp4-b300-vllm:
     agentic-coding:
     - duration: 1800
       search-space:
-      # Pure TP=4 — half-node interactivity, leaves capacity for parallel runs.
-      - { tp: 4, offloading: none, conc-list: [1, 2, 4, 8, 16, 32] }
+      # cpu offload only this iteration — none entries already validated in
+      # earlier runs. Re-add when investigating regressions in offload=none.
       - { tp: 4, offloading: cpu,  conc-list: [16, 32, 64] }
-      # Pure TP=8 — full-node interactivity.
-      - { tp: 8, offloading: none, conc-list: [1, 2, 4, 8, 16, 32] }
       - { tp: 8, offloading: cpu,  conc-list: [16, 32, 64] }
-      # DEP=4 — mid-throughput, half-node DP-attn + EP-MoE.
-      - { tp: 4, ep: 4, dp-attn: true, offloading: none, conc-list: [16, 32, 64, 128] }
       - { tp: 4, ep: 4, dp-attn: true, offloading: cpu,  conc-list: [64, 128, 256] }
-      # DEP=8 — high-throughput per blog recipe, full-node DP-attn + EP-MoE.
-      - { tp: 8, ep: 8, dp-attn: true, offloading: none, conc-list: [32, 64, 128, 256] }
       - { tp: 8, ep: 8, dp-attn: true, offloading: cpu,  conc-list: [128, 256, 512] }
 
 dsv4-fp4-b300-trt:
