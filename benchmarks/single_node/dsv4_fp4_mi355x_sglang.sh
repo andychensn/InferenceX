@@ -59,13 +59,11 @@ export SGLANG_OPT_USE_TILELANG_SWA_PREPARE=false
 export SGLANG_OPT_USE_JIT_KERNEL_FUSED_TOPK=false
 export SGLANG_OPT_USE_FUSED_HASH_TOPK=false
 export SGLANG_OPT_DEEPGEMM_HC_PRENORM=false
-export SGLANG_OPT_USE_TILELANG_MHC_PRE=false # TODO maybe true????????????
-export SGLANG_OPT_USE_TILELANG_MHC_POST=false
+export SGLANG_OPT_USE_TILELANG_MHC_PRE=false # TODO
+export SGLANG_OPT_USE_TILELANG_MHC_POST=true
 export SGLANG_ENABLE_THINKING=1
 export SGLANG_USE_AITER=1
 export SGLANG_USE_ROCM700A=1
-export SGLANG_TOPK_TRANSFORM_512_TORCH=0 # not need this flag.
-export SGLANG_FP8_PAGED_MQA_LOGITS_TORCH=1 # not need this flag.
 export SGLANG_DSV4_FP4_EXPERTS=True
 export SGLANG_OPT_DPSK_V4_RADIX=0
 export SGLANG_OPT_USE_OVERLAP_STORE_CACHE=false
@@ -122,19 +120,17 @@ SERVER_PID=$!
 wait_for_server_ready --port "$PORT" --server-log "$SERVER_LOG" --server-pid "$SERVER_PID"
 
 
-tail -f $SERVER_LOG
-
-# run_benchmark_serving \
-#     --model "$MODEL" \
-#     --port "$PORT" \
-#     --backend vllm \
-#     --input-len "$ISL" \
-#     --output-len "$OSL" \
-#     --random-range-ratio "$RANDOM_RANGE_RATIO" \
-#     --num-prompts "$((CONC * 10))" \
-#     --max-concurrency "$CONC" \
-#     --result-filename "$RESULT_FILENAME" \
-#     --result-dir /workspace/
+run_benchmark_serving \
+    --model "$MODEL" \
+    --port "$PORT" \
+    --backend vllm \
+    --input-len "$ISL" \
+    --output-len "$OSL" \
+    --random-range-ratio "$RANDOM_RANGE_RATIO" \
+    --num-prompts "$((CONC * 10))" \
+    --max-concurrency "$CONC" \
+    --result-filename "$RESULT_FILENAME" \
+    --result-dir /workspace/
 
 # After throughput, run evaluation only if RUN_EVAL is true
 if [ "${RUN_EVAL}" = "true" ]; then
