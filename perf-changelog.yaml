@@ -2216,4 +2216,4 @@
     - "Model: nvidia/Qwen3.5-397B-A17B-NVFP4"
     - "1k1k: TP-only (tp4 conc 4-16, tp8 conc 4), TEP (tp4ep4 conc 16-256), DEP (tp4ep4 dp-attn conc 1024, tp8ep8 dp-attn conc 512-1024)"
     - "8k1k: TP-only (tp2 conc 4-32, tp4 conc 4-8, tp8 conc 4), TEP (tp2ep2 conc 64, tp4ep4 conc 16), DEP (tp4ep4 dp-attn conc 256-1024, tp8ep8 dp-attn conc 512-1024)"
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1280
