@@ -178,21 +178,33 @@ jobs:
           # files as `.nfs<hex>` until the holder closes them — so an
           # orphaned `tail -F` left over from a previous launcher run blocks
           # the cleanup with EBUSY and the whole job fails before any of
-          # our code runs. Find any process with an open file under this
-          # workspace and SIGKILL it before checkout, then evaporate any
-          # leftover .nfs* turds. Best-effort — silent when nothing's stuck.
+          # our code runs.
+          #
+          # IMPORTANT: do NOT use `fuser -m $ws` to broad-kill — `-m`
+          # resolves to the mountpoint (typically the whole NFS share)
+          # and SIGKILLs every process using it, including the GHA
+          # runner agent. The runner agent goes offline mid-step and
+          # GHA marks the job failed ~10 min later. We learned this the
+          # hard way (see prior commit history). Instead, only kill
+          # the specific orphan that holds our workspace open.
           set +e
           ws="${{ github.workspace }}"
-          if [ -d "$ws" ] && command -v fuser >/dev/null 2>&1; then
-            echo "[nfs-clean] killing any process holding files under $ws"
-            fuser -k -SIGKILL -m "$ws" 2>/dev/null || true
-            sleep 2
-          fi
-          # Belt-and-suspenders: also kill anything that looks like a
-          # leftover sweep / benchmark tail across the runner host.
+          # Fast path: name-based pkill of exactly the kind of orphan we know about.
           pkill -KILL -f 'tail -[fF].*sweep_[0-9]+' 2>/dev/null || true
           pkill -KILL -f 'tail -[fF].*benchmark\.out' 2>/dev/null || true
+          # Slow path: only if there are actual .nfs* turds in our workspace,
+          # find the exact pids holding them and SIGKILL just those — never
+          # the broad mountpoint set.
           if [ -d "$ws" ]; then
+            mapfile -t nfs_files < <(find "$ws" -name '.nfs*' 2>/dev/null)
+            if [ "${#nfs_files[@]}" -gt 0 ] && command -v fuser >/dev/null 2>&1; then
+              echo "[nfs-clean] ${#nfs_files[@]} stale .nfs file(s) found"
+              for f in "${nfs_files[@]}"; do
+                pids=$(fuser "$f" 2>/dev/null | tr -d ' ')
+                [ -n "$pids" ] && echo "[nfs-clean] killing pids $pids holding $f" && kill -KILL $pids 2>/dev/null
+              done
+              sleep 2
+            fi
             find "$ws" -name '.nfs*' -print -delete 2>/dev/null || true
           fi
           set -e
