@@ -2172,6 +2172,15 @@
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1266
 
 - config-keys:
+    - dsv4-fp4-gb200-dynamo-vllm-mtp2
+  description:
+    - "Fix result file parsing for non-disagg multinode benchmarks (decode num-worker=0)"
+    - "sa-bench result files without _ctx_/_gen_ suffix were silently dropped from the summary table"
+    - "Use vllm/vllm-openai:v0.20.1-ubuntu2404 directly for GB200 MTP2 instead of upgrading vLLM inside the v0.20.0 container"
+    - "Fix applies to all 7 multinode launch scripts, the benchmark-multinode-tmpl workflow, and process_result.py"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1256
+
+- config-keys:
     - dsv4-fp4-mi355x-atom
   description:
     - "Update DSv4 ATOM to rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
