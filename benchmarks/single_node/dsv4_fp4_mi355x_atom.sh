@@ -281,6 +281,17 @@ else
   EP=" "
 fi
 
+if [[ -z "${ATOM_MAX_NUM_BATCHED_TOKENS:-}" ]]; then
+    # The image default is 16384, which splits conc=64 1k-prefill traffic into
+    # 4-5 prefill batches. Use a conservative larger default for high-conc 1k
+    # runs while keeping an env override for 64k experiments.
+    if [ "$ISL" -le 1024 ] && [ "$CONC" -ge 64 ]; then
+        ATOM_MAX_NUM_BATCHED_TOKENS=32768
+    else
+        ATOM_MAX_NUM_BATCHED_TOKENS=16384
+    fi
+fi
+
 run_dsv4_atom_eval_diagnostics() {
     local diag_file="sample_dsv4_atom_eval_diag_${RESULT_FILENAME}.jsonl"
     local diag_conc_list="${ATOM_DSV4_DIAG_CONCURRENCY_LIST:-1,$CONC}"
@@ -415,6 +426,7 @@ python3 -m atom.entrypoints.openai_server \
     -tp "$TP" \
     --kv_cache_dtype fp8 $CALCULATED_MAX_MODEL_LEN $EP \
     --block-size "$BLOCK_SIZE" \
+    --max-num-batched-tokens "$ATOM_MAX_NUM_BATCHED_TOKENS" \
     --enforce-eager \
     --trust-remote-code \
     "${ATOM_PROFILE_ARGS[@]}" > "$SERVER_LOG" 2>&1 &

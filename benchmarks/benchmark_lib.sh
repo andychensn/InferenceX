@@ -433,6 +433,11 @@ setup_atom_profile_args() {
     ATOM_PROFILE_ARGS=()
     if [[ "${PROFILE:-}" == "1" ]]; then
         ATOM_TORCH_PROFILER_DIR=${ATOM_TORCH_PROFILER_DIR:-/workspace/atom_profiles}
+        case "$ATOM_TORCH_PROFILER_DIR" in
+            /workspace/atom_profiles|/workspace/atom_profiles/*|/tmp/*)
+                rm -rf "$ATOM_TORCH_PROFILER_DIR"
+                ;;
+        esac
         mkdir -p "$ATOM_TORCH_PROFILER_DIR"
         ATOM_PROFILE_ARGS+=(--torch-profiler-dir "$ATOM_TORCH_PROFILER_DIR")
     fi
@@ -463,6 +468,9 @@ _find_latest_profile_trace() {
             if [[ "$base" == profile_*.trace.json.gz ]]; then
                 continue
             fi
+            if [[ ! -s "$candidate" ]]; then
+                continue
+            fi
             if [[ -z "$latest" || "$candidate" -nt "$latest" ]]; then
                 latest="$candidate"
             fi
@@ -474,6 +482,32 @@ _find_latest_profile_trace() {
     done
 
     printf '%s' "$latest"
+}
+
+_profile_trace_is_ready() {
+    local trace_file="$1"
+    local size_before="" size_after=""
+
+    if [[ ! -s "$trace_file" ]]; then
+        return 1
+    fi
+
+    size_before="$(wc -c < "$trace_file" 2>/dev/null || printf '0')"
+    sleep "${PROFILE_TRACE_STABLE_SLEEP:-2}"
+    if [[ ! -s "$trace_file" ]]; then
+        return 1
+    fi
+    size_after="$(wc -c < "$trace_file" 2>/dev/null || printf '0')"
+
+    if [[ "$size_before" != "$size_after" || "$size_after" -le 0 ]]; then
+        return 1
+    fi
+
+    if [[ "$trace_file" == *.gz ]]; then
+        gzip -t "$trace_file" >/dev/null 2>&1 || return 1
+    fi
+
+    return 0
 }
 
 # Move profiler trace into a stable workspace path for workflow relay/upload.
@@ -511,17 +545,21 @@ move_profile_trace_for_relay() {
     done
 
     local trace_file=""
-    local wait_attempts=10
+    local wait_attempts="${PROFILE_TRACE_WAIT_ATTEMPTS:-30}"
     for (( i=1; i<=wait_attempts; i++ )); do
         trace_file="$(_find_latest_profile_trace "${search_dirs[@]}")"
-        if [[ -n "$trace_file" ]]; then
+        if [[ -n "$trace_file" ]] && _profile_trace_is_ready "$trace_file"; then
             break
         fi
-        sleep 10
+        if [[ -n "$trace_file" ]]; then
+            echo "[PROFILE] Waiting for trace to finish writing: $trace_file" >&2
+        fi
+        trace_file=""
+        sleep "${PROFILE_TRACE_WAIT_SLEEP:-5}"
     done
 
     if [[ -z "$trace_file" ]]; then
-        echo "[PROFILE] No trace found for relay under: ${search_dirs[*]}" >&2
+        echo "[PROFILE] No complete trace found for relay under: ${search_dirs[*]}" >&2
         return 0
     fi
 
@@ -530,6 +568,12 @@ move_profile_trace_for_relay() {
         cp -f "$trace_file" "$dest_trace"
     else
         gzip -c "$trace_file" > "$dest_trace"
+    fi
+
+    if [[ ! -s "$dest_trace" ]] || ! gzip -t "$dest_trace" >/dev/null 2>&1; then
+        echo "[PROFILE] Relay trace is invalid after staging: $dest_trace" >&2
+        rm -f "$dest_trace"
+        return 0
     fi
 
     echo "[PROFILE] Relay trace prepared: $dest_trace (source: $trace_file)"

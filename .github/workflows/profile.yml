@@ -184,6 +184,11 @@ jobs:
 
           trace_path="profile_${res_name}.trace.json.gz"
           if [ -f "$trace_path" ]; then
+            if [ ! -s "$trace_path" ]; then
+              echo "Profile trace is empty: $trace_path" >&2
+              exit 1
+            fi
+            gzip -t "$trace_path"
             echo "trace=$trace_path" >> "$GITHUB_OUTPUT"
             if [ "${FRAMEWORK}" = "sglang" ]; then
               # Try to locate corresponding TP-0 traces produced by SGLang profiler
@@ -224,6 +229,7 @@ jobs:
             agg_${{ env.RESULT_FILENAME }}.json
             server.log
             gpu_metrics.csv
+            atom_profiles/**/*.trace.json.gz
           if-no-files-found: ignore
 
       - name: Upload profile as artifact
