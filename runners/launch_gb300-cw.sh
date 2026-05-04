@@ -233,13 +233,19 @@ containers:
 # cluster-level setting, not a recipe overlay; the copied recipe files
 # stay byte-identical to the pinned upstream commit.
 use_segment_sbatch_directive: true
-# Cluster-wide bash preamble — runs before every container srun. Raises
-# NOFILE so the dynamo frontend / sglang servers can accept high
-# concurrency (8192 in the 7p1d sweep) without EMFILE / "too many open
-# files". Mirrors what `yangminl@slurm-login-0:~/srt-slurm/srtslurm.yaml`
-# already uses for manual runs on this cluster.
-default_bash_preamble: "ulimit -n 1048576 && ulimit -a"
 EOF
+
+# Append default_bash_preamble (raises NOFILE for high-concurrency sglang
+# on the fzyzcjy/srt-slurm fork pinned by the dsv4 branch) — but only
+# when running dsv4. Our cquil11/srt-slurm-nv branch (used by dsr1)
+# does not yet recognise this schema field and srtctl rejects the file.
+# Use a quoted heredoc to avoid the shell trying to expand backticks
+# in the comment lines we previously inlined.
+if [[ $MODEL_PREFIX == "dsv4" ]]; then
+    cat >> srtslurm.yaml <<'PREAMBLE'
+default_bash_preamble: "ulimit -n 1048576 && ulimit -a"
+PREAMBLE
+fi
 
 echo "Generated srtslurm.yaml:"
 cat srtslurm.yaml
