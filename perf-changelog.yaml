@@ -2188,3 +2188,4 @@
     - "Remove temporary DSv4 ATOM/AITER runtime patches, perf-stack cherry-picks, dense fast paths, and shortened smoke-run defaults"
     - "Retest higher DSv4 ATOM concurrency points: 1k1k conc 1-8, 8k1k conc 1-4"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1260
+  evals-only: true

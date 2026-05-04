@@ -109,7 +109,7 @@ fi
 if [ "${ATOM_DSV4_PR650:-1}" = "1" ]; then
     ATOM_PR650_REPO=${ATOM_PR650_REPO:-https://github.com/Oseltamivir/ATOM.git}
     ATOM_PR650_REF=${ATOM_PR650_REF:-dsv4-aiter-pr2998-indexer}
-    ATOM_PR650_SHA=${ATOM_PR650_SHA:-4634e6ac46bb377834ac4d45d3be5e288a222c82}
+    ATOM_PR650_SHA=${ATOM_PR650_SHA:-6a1b7a58bde47c2790f63d7927b9686512d4fc39}
     ATOM_PR650_DIR=${ATOM_PR650_DIR:-/tmp/atom-dsv4-pr650}
 
     rm -rf "$ATOM_PR650_DIR"
@@ -292,6 +292,14 @@ if [[ -z "${ATOM_MAX_NUM_BATCHED_TOKENS:-}" ]]; then
     fi
 fi
 
+if [ "${EVAL_ONLY:-false}" = "true" ] && [ "${ATOM_DSV4_COMPONENT_DIAG:-1}" = "1" ]; then
+    export ATOM_DSV4_DIAG_EQUIV="${ATOM_DSV4_DIAG_EQUIV:-1}"
+    export ATOM_DSV4_DIAG_LAYERS="${ATOM_DSV4_DIAG_LAYERS:-all}"
+    export ATOM_DSV4_DIAG_VERBOSE="${ATOM_DSV4_DIAG_VERBOSE:-1}"
+    export ATOM_DSV4_DIAG_TOKEN_LIMIT="${ATOM_DSV4_DIAG_TOKEN_LIMIT:-3}"
+    echo "DSv4 component diagnostics enabled: layers=${ATOM_DSV4_DIAG_LAYERS}, token_limit=${ATOM_DSV4_DIAG_TOKEN_LIMIT}"
+fi
+
 run_dsv4_atom_eval_diagnostics() {
     local diag_file="sample_dsv4_atom_eval_diag_${RESULT_FILENAME}.jsonl"
     local diag_conc_list="${ATOM_DSV4_DIAG_CONCURRENCY_LIST:-1,$CONC}"
@@ -450,7 +458,7 @@ run_benchmark_serving \
     --trust-remote-code
 
 if [ "${RUN_EVAL}" = "true" ]; then
-    run_eval --framework lm-eval --port "$PORT" --limit "${EVAL_LIMIT:-16}"
+    run_eval --framework lm-eval --port "$PORT" --limit "${EVAL_LIMIT:-640}"
     append_lm_eval_summary
     if [ "${ATOM_DSV4_EVAL_DIAG:-1}" = "1" ]; then
         run_dsv4_atom_eval_diagnostics || echo "WARN: DSv4 eval diagnostics failed" >&2
