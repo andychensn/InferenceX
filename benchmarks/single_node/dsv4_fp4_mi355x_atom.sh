@@ -306,123 +306,18 @@ fi
 run_dsv4_atom_eval_diagnostics() {
     local diag_file="sample_dsv4_atom_eval_diag_${RESULT_FILENAME}.jsonl"
     local diag_conc_list="${ATOM_DSV4_DIAG_CONCURRENCY_LIST:-1,$CONC}"
-    echo "[DSv4 diag] Sending deterministic identical-prompt probes; output: ${diag_file}"
+    local diag_script
+    diag_script="$(dirname "$0")/../../utils/dsv4_atom_eval_diag.py"
+    if [ ! -f "$diag_script" ]; then
+        diag_script="/workspace/utils/dsv4_atom_eval_diag.py"
+    fi
+    echo "[DSv4 diag] Running concurrency isolation matrix; output: ${diag_file}"
     DIAG_PORT="$PORT" \
     DIAG_MODEL="$MODEL" \
     DIAG_CONC_LIST="$diag_conc_list" \
+    DIAG_ISL="$ISL" \
     DIAG_OUT="$diag_file" \
-    python3 - <<'PYEOF'
-import concurrent.futures
-import hashlib
-import json
-import os
-import time
-import urllib.error
-import urllib.request
-
-port = os.environ["DIAG_PORT"]
-model = os.environ["DIAG_MODEL"]
-out_path = os.environ["DIAG_OUT"]
-raw_levels = os.environ.get("DIAG_CONC_LIST", "1,2,4,8,16")
-levels = []
-for item in raw_levels.split(","):
-    item = item.strip()
-    if item:
-        try:
-            levels.append(max(1, int(item)))
-        except ValueError:
-            pass
-levels = sorted(set(levels)) or [1]
-
-tok_bos = "<\uff5cbegin\u2581of\u2581sentence\uff5c>"
-tok_user = "<\uff5cUser\uff5c>"
-tok_assistant = "<\uff5cAssistant\uff5c>"
-tok_eos = "<\uff5cend\u2581of\u2581sentence\uff5c>"
-prompt = (
-    f"{tok_bos}{tok_user}"
-    "Question: Janet's ducks lay 16 eggs per day. She eats three for breakfast "
-    "every morning and bakes muffins for her friends every day with four. "
-    "She sells the remainder at the farmers' market daily for $2 per fresh "
-    "duck egg. How much in dollars does she make every day at the farmers' "
-    "market?\n"
-    "End your response with the answer on the last line, formatted as: #### [number]\n"
-    f"Answer:{tok_assistant}</think>"
-)
-stop = [tok_eos, tok_user, tok_assistant, "</s>", "<|im_end|>"]
-url = f"http://127.0.0.1:{port}/v1/completions"
-
-def one_request(level: int, request_id: int) -> dict:
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "max_tokens": 96,
-        "temperature": 0,
-        "top_p": 1,
-        "stop": stop,
-    }
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer EMPTY",
-        },
-    )
-    started = time.time()
-    try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-        text = body["choices"][0].get("text", "")
-        return {
-            "level": level,
-            "request_id": request_id,
-            "ok": True,
-            "latency_s": round(time.time() - started, 3),
-            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            "length": len(text),
-            "has_final_answer": "####" in text,
-            "text": text,
-        }
-    except Exception as exc:
-        if isinstance(exc, urllib.error.HTTPError):
-            detail = exc.read().decode("utf-8", "replace")
-        else:
-            detail = ""
-        return {
-            "level": level,
-            "request_id": request_id,
-            "ok": False,
-            "latency_s": round(time.time() - started, 3),
-            "error": repr(exc),
-            "detail": detail[:2000],
-        }
-
-with open(out_path, "w", encoding="utf-8") as out:
-    for level in levels:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=level) as pool:
-            rows = list(pool.map(lambda i: one_request(level, i), range(level)))
-        hashes = sorted({r.get("sha256") for r in rows if r.get("ok")})
-        errors = [r for r in rows if not r.get("ok")]
-        missing_final = [r["request_id"] for r in rows if r.get("ok") and not r.get("has_final_answer")]
-        print(
-            "[DSv4 diag] "
-            f"concurrency={level} ok={level - len(errors)}/{level} "
-            f"unique_outputs={len(hashes)} missing_final={missing_final}"
-        )
-        if len(hashes) > 1 or errors or missing_final:
-            for row in rows[: min(4, len(rows))]:
-                snippet = row.get("text", row.get("error", "")).replace("\n", " ")[:240]
-                print(
-                    "[DSv4 diag] "
-                    f"  req={row['request_id']} ok={row.get('ok')} "
-                    f"len={row.get('length')} sha={row.get('sha256', '')[:12]} "
-                    f"snippet={snippet!r}"
-                )
-        for row in rows:
-            out.write(json.dumps(row, ensure_ascii=True) + "\n")
-PYEOF
+    python3 "$diag_script"
 }
 
 start_gpu_monitor
