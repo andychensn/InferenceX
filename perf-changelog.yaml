@@ -2216,11 +2216,10 @@
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1279
 
 - config-keys:
-    - dsv4-fp4-mi355x-vllm
+    - dsv4-fp8-mi355x-vllm
   description:
-    - "Add DeepSeek-V4-Pro FP4 MI355X vLLM benchmark following the recipes.vllm.ai DeepSeek-V4-Pro page (vllm-project/vllm#40871 base + #41217 MLA Indexer optimization)"
-    - "Image: rocm/vllm-dev:deepseek-v4-latest — ships the validated build, so no runtime PR clone/patch/pip-rebuild is needed (unlike the existing dsv4-fp8-mi355x-vllm overlay path)"
-    - "FP4 path: same DeepSeek-V4-Pro FP4+FP8 mixed checkpoint; --moe-backend triton_unfused consumes the FP4 expert weights directly. KV cache stays fp8"
-    - "Recipe flags from the docs: VLLM_ROCM_USE_AITER=1, VLLM_ROCM_USE_AITER_LINEAR=1, --gpu-memory-utilization 0.6, --max-num-seqs 128 (auto-grows past CONC), --max-num-batched-tokens 8192, --distributed-executor-backend mp, --async-scheduling, --enforce-eager, --tokenizer-mode/reasoning-parser/tool-call-parser deepseek_v4"
-    - "Search space: TP=8, CONC 1-128 for both 1k1k and 8k1k"
+    - "Rewrite dsv4-fp8-mi355x-vllm to follow the recipes.vllm.ai DeepSeek-V4-Pro AMD ROCm page (vllm-project/vllm#40871 + #41217 MLA Indexer)"
+    - "Replace the day-0 ATOM-image + PR-overlay build (~470 lines of runtime git clone, platform patches, pip rebuild) with rocm/vllm-dev:deepseek-v4-latest@sha256:d29cd… which ships the validated vLLM build directly"
+    - "Key recipe changes: add VLLM_ROCM_USE_AITER_LINEAR=1, --distributed-executor-backend mp, --async-scheduling, --max-num-batched-tokens 8192; raise --max-num-seqs 32 → 128 (auto-grows past CONC); lower --gpu-memory-utilization 0.90 → 0.6 per docs validation"
+    - "Widen sweep from CONC 1-1 (day-0 single-sequence marker) to CONC 1-128 for both 1k1k and 8k1k"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1282

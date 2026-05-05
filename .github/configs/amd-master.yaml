@@ -1610,43 +1610,16 @@ dsv4-fp4-mi355x-sglang:
       - { tp: 8, dp-attn: true, conc-start: 16, conc-end: 128 }
       - { tp: 8, dp-attn: false, conc-start: 1, conc-end: 16 }
 
-# vLLM with AITER MLA decode for DSv4 on MI355X (vllm-project/vllm#40889,
-# stacked on #40871). Uses the ATOM MI355X image (ROCm 7.2.2, aiter with
-# MLA decode, MI355X GPU detection); vLLM is rebuilt from the PR branch
-# at runtime by benchmarks/single_node/dsv4_fp8_mi355x_vllm.sh at a
-# pinned SHA. Once both PRs merge into a release, switch to a vLLM ROCm
-# MI355X image and remove the build step.
+# vLLM DSv4-Pro FP8 on MI355X following the recipes.vllm.ai
+# DeepSeek-V4-Pro page (vllm-project/vllm#40871 base + #41217 MLA
+# Indexer). Uses rocm/vllm-dev:deepseek-v4-latest which ships the
+# validated build with AITER + ROCm 7.2.1 — no runtime PR overlay.
 dsv4-fp8-mi355x-vllm:
-  image: rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post
-  model: deepseek-ai/DeepSeek-V4-Pro
-  model-prefix: dsv4
-  runner: mi355x
-  precision: fp8
-  framework: vllm
-  multinode: false
-  scenarios:
-    fixed-seq-len:
-    - isl: 1024
-      osl: 1024
-      search-space:
-      - { tp: 8, conc-start: 1, conc-end: 1 }
-    - isl: 8192
-      osl: 1024
-      search-space:
-      - { tp: 8, conc-start: 1, conc-end: 1 }
-
-# vLLM DSv4-Pro on MI355X following the recipes.vllm.ai DeepSeek-V4-Pro
-# page (vllm-project/vllm#40871 base + #41217 MLA Indexer). Uses the
-# deepseek-v4 vLLM ROCm image directly — no runtime PR overlay because
-# the image already ships the validated build. FP4 here means the
-# triton_unfused MoE backend consumes the FP4 expert weights from the
-# DeepSeek-V4-Pro FP4+FP8 mixed checkpoint; KV cache stays fp8.
-dsv4-fp4-mi355x-vllm:
   image: rocm/vllm-dev:deepseek-v4-latest@sha256:d29cd950e683bbbd2a211812ce76db1f46401ca2c43bb6b9627a71a113723d3f
   model: deepseek-ai/DeepSeek-V4-Pro
   model-prefix: dsv4
   runner: mi355x
-  precision: fp4
+  precision: fp8
   framework: vllm
   multinode: false
   scenarios:
