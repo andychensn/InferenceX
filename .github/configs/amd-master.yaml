@@ -1635,6 +1635,31 @@ dsv4-fp8-mi355x-vllm:
       search-space:
       - { tp: 8, conc-start: 1, conc-end: 1 }
 
+# vLLM DSv4-Pro on MI355X following the recipes.vllm.ai DeepSeek-V4-Pro
+# page (vllm-project/vllm#40871 base + #41217 MLA Indexer). Uses the
+# deepseek-v4 vLLM ROCm image directly — no runtime PR overlay because
+# the image already ships the validated build. FP4 here means the
+# triton_unfused MoE backend consumes the FP4 expert weights from the
+# DeepSeek-V4-Pro FP4+FP8 mixed checkpoint; KV cache stays fp8.
+dsv4-fp4-mi355x-vllm:
+  image: rocm/vllm-dev:deepseek-v4-latest
+  model: deepseek-ai/DeepSeek-V4-Pro
+  model-prefix: dsv4
+  runner: mi355x
+  precision: fp4
+  framework: vllm
+  multinode: false
+  scenarios:
+    fixed-seq-len:
+    - isl: 1024
+      osl: 1024
+      search-space:
+      - { tp: 8, conc-start: 1, conc-end: 128 }
+    - isl: 8192
+      osl: 1024
+      search-space:
+      - { tp: 8, conc-start: 1, conc-end: 128 }
+
 # Day-0 single-sequence marker for DeepSeek-V4 on ATOM (ROCm/ATOM#650).
 # PR1 of the ATOM DSv4 series still uses torch sparse-attention fallbacks
 # that OOM once warmup/prefill batches multiple requests; keep CONC=1 until
