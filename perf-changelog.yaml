@@ -2209,20 +2209,19 @@
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1222
 
 - config-keys:
-<<<<<<< dsv4-atom-pr2998-clean
-    - dsv4-fp4-mi355x-atom
-  description:
-    - "Update DSv4 ATOM to rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
-    - "Overlay Oseltamivir/ATOM@4af320d stacked on ROCm/ATOM#650 and ROCm/aiter#2998@969863a for the current DSv4 AITER indexer/top-k path, structured eval answer trimming, and deep L0 attention diagnostics"
-    - "Remove temporary DSv4 ATOM/AITER runtime patches, perf-stack cherry-picks, dense fast paths, and shortened smoke-run defaults"
-    - "Lower DSv4 ATOM --max-num-batched-tokens default to max(4096, ISL) instead of carrying a fork-only warmup cap"
-    - "Retest higher DSv4 ATOM concurrency points: 1k1k conc 1-8, 8k1k conc 1-4"
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1260
-  evals-only: true
-=======
     - dsv4-fp8-h200-vllm-mtp
   description:
     - "Bump --speculative-config num_speculative_tokens from 1 to 2 (`{\"method\":\"mtp\",\"num_speculative_tokens\":2}`)"
     - "Re-test whether H200 MTP kernels accept 2 draft tokens — Blackwell MTP runs at 2 (per @wzhao18's vLLM Blackwell MTP submission); checking if H200 has parity now"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1279
->>>>>>> main
+
+- config-keys:
+    - dsv4-fp4-mi355x-atom
+  description:
+    - "Update DSv4 ATOM to rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    - "Overlay Oseltamivir/ATOM@3ed6633 stacked on ROCm/ATOM#650 and ROCm/aiter#2998@969863a for the current DSv4 AITER indexer/top-k path, structured eval answer trimming, deep L0 attention diagnostics, and split wq_a/wkv projections"
+    - "Remove temporary DSv4 ATOM/AITER runtime patches, perf-stack cherry-picks, dense fast paths, and shortened smoke-run defaults"
+    - "Lower DSv4 ATOM --max-num-batched-tokens default to max(4096, ISL) instead of carrying a fork-only warmup cap"
+    - "Retest higher DSv4 ATOM concurrency points: 1k1k conc 1-8, 8k1k conc 1-4"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1260
+  evals-only: true
