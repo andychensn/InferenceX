@@ -727,6 +727,160 @@ run_lm_eval() {
     return $eval_exit
 }
 
+run_sglang_gsm8k_eval() {
+    local port="${PORT:-30000}"
+    local results_dir="${EVAL_RESULT_DIR:-$(mktemp -d /tmp/eval_out-XXXXXX)}"
+    local temperature=0
+    local top_p=1
+    local num_shots="${EVAL_SGLANG_GSM8K_NUM_SHOTS:-8}"
+    local num_questions="${EVAL_SGLANG_GSM8K_NUM_QUESTIONS:-1319}"
+    local parallel="${EVAL_SGLANG_GSM8K_PARALLEL:-${EVAL_CONCURRENT_REQUESTS:-1319}}"
+    local max_new_tokens="${EVAL_SGLANG_GSM8K_MAX_NEW_TOKENS:-512}"
+    local backend="${EVAL_SGLANG_BACKEND:-srt}"
+    local host="${EVAL_SGLANG_HOST:-0.0.0.0}"
+    local data_path="${EVAL_SGLANG_GSM8K_DATA_PATH:-}"
+    local tokenizer_path="${EVAL_SGLANG_GSM8K_TOKENIZER_PATH:-${MODEL_DIR:-}/${MODEL_NAME:-}}"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --port)           port="$2"; shift 2 ;;
+            --results-dir)    results_dir="$2"; shift 2 ;;
+            --temperature)    temperature="$2"; shift 2 ;;
+            --top-p)          top_p="$2"; shift 2 ;;
+            *)                echo "Unknown parameter: $1"; return 1 ;;
+        esac
+    done
+
+    local bench_script="${EVAL_SGLANG_GSM8K_SCRIPT:-}"
+    if [[ -z "$bench_script" ]]; then
+        local candidate
+        for candidate in \
+            "${SGLANG_WS_PATH:-}/benchmark/gsm8k/bench_sglang.py" \
+            "${SGLANG_WS_PATH:-}/sglang/benchmark/gsm8k/bench_sglang.py" \
+            "/sgl-workspace/sglang/benchmark/gsm8k/bench_sglang.py" \
+            "/sgl-workspace/benchmark/gsm8k/bench_sglang.py"; do
+            if [[ -f "$candidate" ]]; then
+                bench_script="$candidate"
+                break
+            fi
+        done
+    fi
+    if [[ -z "$bench_script" || ! -f "$bench_script" ]]; then
+        echo "ERROR: benchmark/gsm8k/bench_sglang.py not found; set EVAL_SGLANG_GSM8K_SCRIPT" >&2
+        return 1
+    fi
+
+    mkdir -p "$results_dir"
+    results_dir="$(cd "$results_dir" && pwd)"
+    local stamp
+    stamp="$(date -u +%Y-%m-%dT%H-%M-%S)"
+    local sglang_result_jsonl="${results_dir}/sglang_gsm8k_result_${stamp}.jsonl"
+    local raw_result_jsonl="${results_dir}/samples_gsm8k_${stamp}.jsonl"
+    local results_json="${results_dir}/results_${stamp}.json"
+
+    export EVAL_RESULT_DIR="$results_dir"
+    MODEL_NAME=${MODEL_NAME:-$MODEL}
+
+    local cmd=(
+        python3 "$bench_script"
+        --host "$host"
+        --port "$port"
+        --backend "$backend"
+        --num-shots "$num_shots"
+        --num-questions "$num_questions"
+        --parallel "$parallel"
+        --max-new-tokens "$max_new_tokens"
+        --temperature "$temperature"
+        --top-p "$top_p"
+        --result-file "$sglang_result_jsonl"
+        --raw-result-file "$raw_result_jsonl"
+    )
+    if [[ -n "$data_path" ]]; then
+        cmd+=(--data-path "$data_path")
+    fi
+    if [[ "${EVAL_SGLANG_GSM8K_PLATINUM:-false}" == "true" ]]; then
+        cmd+=(--platinum)
+    fi
+    if [[ "${EVAL_SGLANG_GSM8K_ENABLE_THINKING:-false}" == "true" ]]; then
+        cmd+=(--enable-thinking --tokenizer-path "$tokenizer_path")
+    fi
+
+    echo "Running SGLang GSM8K benchmark: script=${bench_script}, questions=${num_questions}, shots=${num_shots}, parallel=${parallel}, max_new_tokens=${max_new_tokens}"
+    pushd "$results_dir" >/dev/null
+    set -x
+    "${cmd[@]}"
+    local eval_exit=$?
+    set +x
+    popd >/dev/null
+    if [[ "$eval_exit" -ne 0 ]]; then
+        return "$eval_exit"
+    fi
+
+    python3 - "$raw_result_jsonl" "$sglang_result_jsonl" "$results_json" "${MODEL_NAME:-}" <<'PY'
+import json
+import math
+import sys
+from pathlib import Path
+
+raw_path = Path(sys.argv[1])
+summary_path = Path(sys.argv[2])
+out_path = Path(sys.argv[3])
+model_name = sys.argv[4]
+
+summary_rows = []
+if summary_path.exists():
+    with summary_path.open() as f:
+        summary_rows = [json.loads(line) for line in f if line.strip()]
+summary = summary_rows[-1] if summary_rows else {}
+
+raw_rows = []
+if raw_path.exists():
+    with raw_path.open() as f:
+        raw_rows = [json.loads(line) for line in f if line.strip()]
+
+if raw_rows:
+    n_eff = len(raw_rows)
+    acc = sum(1 for row in raw_rows if row.get("correct")) / n_eff
+else:
+    n_eff = int(summary.get("num_requests") or summary.get("other", {}).get("num_questions") or 0)
+    acc = float(summary.get("accuracy", 0.0))
+
+stderr = math.sqrt(acc * (1.0 - acc) / n_eff) if n_eff else None
+task = summary.get("task") or "gsm8k"
+
+out = {
+    "lm_eval_version": "sglang-gsm8k-bench",
+    "model_name": model_name,
+    "results": {
+        task: {
+            "exact_match,strict-match": acc,
+            "exact_match_stderr,strict-match": stderr,
+            "exact_match,flexible-extract": acc,
+            "exact_match_stderr,flexible-extract": stderr,
+        }
+    },
+    "configs": {
+        task: {
+            "metric_list": [{"metric": "exact_match"}],
+            "filter_list": [
+                {"name": "strict-match"},
+                {"name": "flexible-extract"},
+            ],
+            "metadata": {
+                "version": "sglang-gsm8k-bench",
+                "model": model_name,
+            },
+        }
+    },
+    "n-samples": {task: {"effective": n_eff}},
+    "sglang_gsm8k": summary,
+}
+out_path.write_text(json.dumps(out, indent=2) + "\n")
+print(f"Wrote SGLang GSM8K eval results to {out_path} (accuracy={acc:.4f}, n={n_eff})")
+PY
+    rm -f "$sglang_result_jsonl"
+}
+
 append_lm_eval_summary() {
     local results_dir="${EVAL_RESULT_DIR}"
     if [ -z "${results_dir}" ]; then
@@ -860,6 +1014,7 @@ run_eval() {
     local eval_rc=0
     case "$framework" in
         lm-eval|lm_eval) run_lm_eval "${forwarded[@]}" || eval_rc=$? ;;
+        sglang-gsm8k|sglang_gsm8k|bench-sglang|bench_sglang) run_sglang_gsm8k_eval "${forwarded[@]}" || eval_rc=$? ;;
         *)               echo "Unknown framework '${framework}'"; eval_rc=1 ;;
     esac
 
