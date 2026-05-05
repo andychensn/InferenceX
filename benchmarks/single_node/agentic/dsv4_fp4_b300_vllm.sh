@@ -79,8 +79,14 @@ case "$OFFLOADING" in
         else
             PER_ENGINE_GB=$TOTAL_CPU_DRAM_GB
         fi
+        PER_ENGINE_BYTES=$((PER_ENGINE_GB * 1024 * 1024 * 1024))
+        # Use --kv-transfer-config JSON to also pass lazy_offload=true. Eager
+        # mode (default) hits an AssertionError in
+        # vllm/v1/core/kv_cache_utils.py:269 popleft_n at low/mid CONC; lazy
+        # mode defers the store path and clears low/mid CONC at 80-100%.
+        # See SimpleCPUOffloadConnector PR #37160 for the lazy_offload knob.
         export VLLM_USE_SIMPLE_KV_OFFLOAD=1
-        OFFLOAD_ARGS="--kv_offloading_backend native --kv_offloading_size $PER_ENGINE_GB"
+        OFFLOAD_ARGS="--kv-transfer-config {\"kv_connector\":\"SimpleCPUOffloadConnector\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{\"cpu_bytes_to_use\":$PER_ENGINE_BYTES,\"lazy_offload\":true}}"
         ;;
     *)
         echo "Error: unsupported OFFLOADING value '$OFFLOADING' (expected one of: none, cpu)" >&2
@@ -96,6 +102,17 @@ fi
 EP_ARGS=()
 if [ "$EP_SIZE" -gt 1 ]; then
     EP_ARGS=(--enable-expert-parallel)
+fi
+
+# --max-num-seqs is per-engine. With DP-attn each DP engine handles only
+# CONC/$TP sequences in steady state (the trace replay tool's CONC users
+# load-balance across DP ranks), so size the per-engine cap to that.
+# Pure TP is a single engine and sees all CONC sequences itself.
+if [ "$DP_ATTENTION" = "true" ]; then
+    PER_ENGINE_MAX_NUM_SEQS=$(( CONC / TP ))
+    [ "$PER_ENGINE_MAX_NUM_SEQS" -lt 1 ] && PER_ENGINE_MAX_NUM_SEQS=1
+else
+    PER_ENGINE_MAX_NUM_SEQS=$CONC
 fi
 
 echo "Starting vllm server..."
@@ -120,7 +137,7 @@ vllm serve "$MODEL" \
 --enable-prefix-caching \
 --no-disable-hybrid-kv-cache-manager \
 --max-model-len "$MAX_MODEL_LEN" \
---max-num-seqs "$CONC" \
+--max-num-seqs "$PER_ENGINE_MAX_NUM_SEQS" \
 $OFFLOAD_ARGS > "$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
