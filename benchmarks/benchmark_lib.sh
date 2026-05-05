@@ -965,6 +965,11 @@ build_replay_cmd() {
     REPLAY_CMD+=" --benchmark-duration $duration"
     REPLAY_CMD+=" --random-seed 42"
     REPLAY_CMD+=" --apply-chat-template"
+    # Default --num-dataset-entries is 100; the weka corpus has 739. Cap
+    # at 739 so all unique traces are loaded (the loader treats this as a
+    # ``min(cap, available)`` ceiling, not a target — see
+    # semianalysis_cc_traces_weka.py).
+    REPLAY_CMD+=" --num-dataset-entries 739"
     REPLAY_CMD+=" --output-artifact-dir $result_dir/trace_replay"
     REPLAY_CMD+=" $TRACE_SOURCE_FLAG"
 }
