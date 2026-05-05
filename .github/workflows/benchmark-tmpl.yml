@@ -253,13 +253,17 @@ jobs:
             results/trace_replay/profile_export_aiperf_aggregate.json
             results/trace_replay/profile_export_aiperf_aggregate.csv
             results/trace_replay/profile_export_aiperf_collated.json
-            results/trace_replay/profile_export_raw.jsonl
             results/trace_replay/server_metrics_export.json
             results/trace_replay/server_metrics_export.jsonl
             results/trace_replay/server_metrics_export.csv
             results/trace_replay/server_metrics_export.parquet
             results/trace_replay/gpu_telemetry_export.jsonl
-            results/trace_replay/inputs.json
+          # Excluded by design (multi-GB debug artifacts, not consumed by
+          # post-processing): results/trace_replay/inputs.json (pre-formatted
+          # request bodies — the mmap'd binary equivalent is rebuilt from
+          # --public-dataset + --random-seed) and
+          # results/trace_replay/profile_export_raw.jsonl (full HTTP bodies
+          # per request — recoverable by re-running the same trace).
           if-no-files-found: ignore
 
       - name: Upload server logs
