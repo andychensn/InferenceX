@@ -39,7 +39,7 @@ python3 -m pip install --no-cache-dir aiohttp transformers numpy tqdm huggingfac
 
 
 set -x
-export VLLM_USE_V2_MODEL_RUNNER=1 
+
 export VLLM_ROCM_USE_AITER=1
 export VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=INT4
 export VLLM_ROCM_USE_AITER_RMSNORM=0
