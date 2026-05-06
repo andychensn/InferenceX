@@ -1,3 +1,6 @@
 **/__pycache__/**
 **/.coverage
 experimental/multiturn/vllm_benchmark/results/
+
+# Local debug scripts that may contain secrets — never commit
+scripts/debug_*.sh
