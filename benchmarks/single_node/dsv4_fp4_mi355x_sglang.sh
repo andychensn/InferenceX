@@ -73,6 +73,10 @@ export SGLANG_OPT_USE_FUSED_STORE_CACHE=false
 export SGLANG_FORCE_TRITON_MOE_FP8=0
 export SGLANG_HACK_FLASHMLA_BACKEND=tilelang
 export SGLANG_OPT_USE_TILELANG_INDEXER=true
+export SGLANG_OPT_USE_AITER_MHC_PRE=true
+export SGLANG_OPT_USE_AITER_MHC_POST=true
+export SGLANG_OPT_USE_TILELANG_MHC_PRE=false
+export SGLANG_OPT_USE_TILELANG_MHC_POST=false
 
 SERVER_LOG=/workspace/server.log
 PORT=${PORT:-8888}
@@ -106,7 +110,7 @@ python3 -m sglang.launch_server \
     --trust-remote-code \
     --disable-radix-cache \
     --attention-backend compressed \
-    --max-running-requests ${CONC} \
+    --max-running-requests 256 \
     --cuda-graph-max-bs ${CONC} \
     --page-size 256 \
     --chunked-prefill-size 8192 \
@@ -121,14 +125,15 @@ SERVER_PID=$!
 # Wait for server to be ready
 wait_for_server_ready --port "$PORT" --server-log "$SERVER_LOG" --server-pid "$SERVER_PID"
 
+export PROFILE=1
 run_benchmark_serving \
     --model "$MODEL" \
     --port "$PORT" \
     --backend vllm \
     --input-len "$ISL" \
-    --output-len "$OSL" \
+    --output-len 50 \
     --random-range-ratio "$RANDOM_RANGE_RATIO" \
-    --num-prompts "$((CONC * 10))" \
+    --num-prompts "$((CONC))" \
     --max-concurrency "$CONC" \
     --result-filename "$RESULT_FILENAME" \
     --result-dir /workspace/
