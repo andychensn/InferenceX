@@ -29,9 +29,8 @@ PORT=${PORT:-8888}
 
 export OMP_NUM_THREADS=1
 export AITER_LOG_LEVEL=WARNING
-# Current DSv4 diagnostics isolate equal-prompt corruption to the AITER TP
-# reduce after L0 attention wo_b. Use torch/RCCL TP reductions for DSv4 until
-# that AITER collective path is fixed.
+# Use torch/RCCL TP reductions for DSv4. AITER's current TP reduce path was
+# observed to corrupt equal-prompt batches at high concurrency.
 export ATOM_DSV4_TP_REDUCE_BACKEND="${ATOM_DSV4_TP_REDUCE_BACKEND:-torch}"
 
 # Keep the runtime overlay narrow: this benchmark uses the updated ATOM image
@@ -113,7 +112,7 @@ fi
 if [ "${ATOM_DSV4_PR650:-1}" = "1" ]; then
     ATOM_PR650_REPO=${ATOM_PR650_REPO:-https://github.com/Oseltamivir/ATOM.git}
     ATOM_PR650_REF=${ATOM_PR650_REF:-dsv4-deep-l0-diag}
-    ATOM_PR650_SHA=${ATOM_PR650_SHA:-7b4f6b1471f8ab72579f467f243c1968237a66ed}
+    ATOM_PR650_SHA=${ATOM_PR650_SHA:-ad408dded16cbe134eed4e16c4b84d3eb1fee3fd}
     ATOM_PR650_DIR=${ATOM_PR650_DIR:-/tmp/atom-dsv4-pr650}
 
     rm -rf "$ATOM_PR650_DIR"
@@ -292,16 +291,6 @@ if [[ -z "${ATOM_MAX_NUM_BATCHED_TOKENS:-}" ]]; then
     if [ "$ISL" -gt "$ATOM_MAX_NUM_BATCHED_TOKENS" ]; then
         ATOM_MAX_NUM_BATCHED_TOKENS="$ISL"
     fi
-fi
-
-if [ "${EVAL_ONLY:-false}" = "true" ] && [ "${ATOM_DSV4_COMPONENT_DIAG:-1}" = "1" ]; then
-    export ATOM_DSV4_DIAG_EQUIV="${ATOM_DSV4_DIAG_EQUIV:-1}"
-    export ATOM_DSV4_DIAG_LAYERS="${ATOM_DSV4_DIAG_LAYERS:-all}"
-    export ATOM_DSV4_DIAG_VERBOSE="${ATOM_DSV4_DIAG_VERBOSE:-1}"
-    export ATOM_DSV4_DIAG_TOKEN_LIMIT="${ATOM_DSV4_DIAG_TOKEN_LIMIT:-3}"
-    export ATOM_DSV4_DIAG_FULL_SEQ_LIMIT="${ATOM_DSV4_DIAG_FULL_SEQ_LIMIT:-128}"
-    export ATOM_DSV4_DEEP_ATTN_REF_DIAG="${ATOM_DSV4_DEEP_ATTN_REF_DIAG:-1}"
-    echo "DSv4 component diagnostics enabled: layers=${ATOM_DSV4_DIAG_LAYERS}, token_limit=${ATOM_DSV4_DIAG_TOKEN_LIMIT}, full_seq_limit=${ATOM_DSV4_DIAG_FULL_SEQ_LIMIT}, attn_ref=${ATOM_DSV4_DEEP_ATTN_REF_DIAG}"
 fi
 
 run_dsv4_atom_eval_diagnostics() {
