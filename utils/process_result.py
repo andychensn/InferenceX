@@ -138,7 +138,7 @@ if bmk_result.get('dataset_name') == 'infinitebench':
 for key, value in bmk_result.items():
     if key.endswith('ms'):
         data[key.replace('_ms', '')] = float(value) / 1000.0
-    if 'tpot' in key:
+    if key.endswith('_ms') and 'tpot' in key:
         data[key.replace('_ms', '').replace(
             'tpot', 'intvty')] = 1000.0 / float(value)
 
