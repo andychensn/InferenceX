@@ -60,6 +60,26 @@ if [ "${AITER_DSV4_PR2998:-1}" = "1" ]; then
                 || git submodule update --init --recursive 3rdparty/composable_kernel
         fi
 
+        python3 - <<'PYEOF'
+from pathlib import Path
+
+path = Path("aiter/ops/gemm_op_a8w8.py")
+source = path.read_text()
+old = '''        if libtype == "asm" and matched_m != m and matched_m <= 512:
+            return gemm_a8w8_blockscale_bpreshuffle_ck(XQ, WQ, x_scale, w_scale, Y)
+'''
+new = '''        if libtype == "asm" and matched_m != m:
+            return gemm_a8w8_blockscale_bpreshuffle_ck(XQ, WQ, x_scale, w_scale, Y)
+'''
+if old in source:
+    path.write_text(source.replace(old, new, 1))
+    print("Patched AITER FP8 blockscale BPRESHUFFLE: disable partial-M ASM dispatch")
+elif new not in source:
+    raise SystemExit("FATAL: AITER partial-M ASM guard anchor not found")
+else:
+    print("AITER FP8 blockscale BPRESHUFFLE partial-M ASM dispatch already disabled")
+PYEOF
+
         PREBUILD_KERNELS=${AITER_PREBUILD_KERNELS:-0} \
         python3 -m pip install --no-deps --no-build-isolation --force-reinstall -e .
     )
