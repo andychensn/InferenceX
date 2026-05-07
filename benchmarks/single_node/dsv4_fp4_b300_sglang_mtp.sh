@@ -9,7 +9,7 @@ source "$(dirname "$0")/../benchmark_lib.sh"
 #                    Also selects MoE backend / chunked-prefill / EAGLE chain
 #                    / mem-fraction-static / max-running-requests:
 #                      true  -> flashinfer_mxfp4 + DP-attn + chunked-prefill 32768
-#                               + EAGLE (1,1,2) + mem-fraction 0.92 + max-running 256
+#                               + EAGLE (3,1,4) + mem-fraction 0.92 + max-running 256
 #                      false -> flashinfer_mxfp4 (TP-only) + chunked-prefill 8192
 #                               + EAGLE (3,1,4) + mem-fraction 0.90 + max-running CONC*3/2
 check_env_vars \
@@ -79,9 +79,9 @@ if [ "${DP_ATTENTION}" = "true" ]; then
     export SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK=0
     SPEC_FLAGS=(
         --speculative-algorithm EAGLE
-        --speculative-num-steps 1
+        --speculative-num-steps 3
         --speculative-eagle-topk 1
-        --speculative-num-draft-tokens 2
+        --speculative-num-draft-tokens 4
     )
     PARALLEL_ARGS=(
         --dp-size "$TP"
@@ -131,6 +131,7 @@ PYTHONNOUSERSITE=1 sglang serve \
     --max-running-requests "$MAX_RUNNING_REQUESTS" \
     --mem-fraction-static "$MEM_FRACTION_STATIC" \
     --swa-full-tokens-ratio 0.1 \
+    --disable-radix-cache \
     "${SPEC_FLAGS[@]}" \
     "${PARALLEL_ARGS[@]}" $EVAL_CONTEXT_ARGS >> $SERVER_LOG 2>&1 &
 
