@@ -114,6 +114,8 @@ python3 -m sglang.launch_server \
     --disable-shared-experts-fusion \
     --tool-call-parser deepseekv4 \
     --reasoning-parser deepseek-v4 \
+    --enable-prefill-delayer \
+    --context-length 9216 \
     --chat-template "$(dirname "$0")/chat_templates/deepseek_v4_thinking.jinja" \
     --watchdog-timeout 1800 $EVAL_CONTEXT_ARGS > $SERVER_LOG 2>&1 &
 
