@@ -17,7 +17,8 @@ from validation import (
 
 seq_len_stoi = {
     "1k1k": (1024, 1024),
-    "8k1k": (8192, 1024)
+    "8k1k": (8192, 1024),
+    "8k256": (8192, 256),
 }
 
 MIN_EVAL_CONC = 16
@@ -37,7 +38,7 @@ def seq_len_to_str(isl: int, osl: int) -> str:
 
 def exp_name_seq_len_to_str(isl: int, osl: int) -> str:
     """Convert configured sequence lengths to the effective benchmark label."""
-    if (isl, osl) == seq_len_stoi["8k1k"]:
+    if (isl, osl) in (seq_len_stoi["8k1k"], seq_len_stoi["8k256"]):
         return "8k256"
     return seq_len_to_str(isl, osl)
 

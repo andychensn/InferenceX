@@ -2886,7 +2886,7 @@ dsv4-fp4-b300-vllm-offline:
   scenarios:
     fixed-seq-len:
     - isl: 8192
-      osl: 1024
+      osl: 256
       search-space:
       # TP-only and TP+EP rows. DP-attn is enabled via vllm's
       # `enable_dp_attention=True` LLM kwarg (single-process — matches what
@@ -2907,7 +2907,7 @@ dsv4-fp4-b300-sglang-offline:
   scenarios:
     fixed-seq-len:
     - isl: 8192
-      osl: 1024
+      osl: 256
       search-space:
       - { tp: 8, ep: 8, dp-attn: true, conc-start: 64, conc-end: 8192, spec-decoding: offline }
 
@@ -2922,7 +2922,7 @@ dsv4-fp4-b300-trt-offline:
   scenarios:
     fixed-seq-len:
     - isl: 8192
-      osl: 1024
+      osl: 256
       search-space:
       - { tp: 8, conc-start: 32, conc-end: 128, spec-decoding: offline }
       - { tp: 8, ep: 8, conc-start: 64, conc-end: 512, spec-decoding: offline }
@@ -8039,7 +8039,7 @@ dsv4-fp4-gb200-dynamo-vllm:
   scenarios:
     fixed-seq-len:
     - isl: 8192
-      osl: 1024
+      osl: 256
       search-space:
       # Validated 8k/1k points mirrored from NVIDIA/srt-slurm
       # aflowers/vllm-gb200-v0.20.0 history. conc-list values match each
@@ -8134,7 +8134,7 @@ dsv4-fp4-gb200-dynamo-sglang:
   scenarios:
     fixed-seq-len:
     - isl: 8192
-      osl: 1024
+      osl: 256
       search-space:
       # Low concurrency: 1p (TP=4) + 1d (TP=4). 2 nodes total.
       - conc-list: [1]
@@ -8221,7 +8221,7 @@ dsv4-fp4-gb200-dynamo-vllm-mtp2:
   scenarios:
     fixed-seq-len:
     - isl: 8192
-      osl: 1024
+      osl: 256
       search-space:
       # Aggregate low latency: TP=8, max-num-seqs=4.
       - conc-list: [1]
