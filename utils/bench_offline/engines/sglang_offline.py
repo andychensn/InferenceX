@@ -83,13 +83,19 @@ def run(args: argparse.Namespace,
     # replicating attention while sharing experts via EP.
     if args.dp_attn:
         a2a_backend = args.dpa_moe_a2a_backend
+        dp_size = args.dpa_size if args.dpa_size is not None else args.tp
+        if dp_size < 1 or args.tp % dp_size != 0:
+            raise ValueError(
+                f"--dpa-size must be a positive divisor of --tp; got "
+                f"dpa_size={dp_size}, tp={args.tp}"
+            )
         deepep_config = (
             '{"normal_dispatch":{"num_sms":96},'
             '"normal_combine":{"num_sms":96}}'
         )
         parallel_kwargs: Dict[str, Any] = {
             "tp_size": args.tp,
-            "dp_size": args.tp,           # DP across all TP ranks
+            "dp_size": dp_size,
             "ep_size": args.ep if args.ep > 1 else args.tp,
             "enable_dp_attention": True,
             "disable_flashinfer_autotune": True,

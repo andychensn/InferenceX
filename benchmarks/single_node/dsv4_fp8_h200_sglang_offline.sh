@@ -77,6 +77,7 @@ if [[ "${DP_ATTENTION}" == "true" ]]; then
     DPA_ENGINE_ARGS=(
         --moe-dense-tp-size 1
         --enable-dp-lm-head
+        --dpa-size 2
         --deepep-mode normal
         --sglang-dpa-env-preset fp8
     )
