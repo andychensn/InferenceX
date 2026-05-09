@@ -82,9 +82,11 @@ def run(args: argparse.Namespace,
             "SGLANG_OPT_FIX_HASH_MEGA_MOE": "1",
             "SGLANG_OPT_USE_FAST_MASK_EP": "1",
             "SGLANG_OPT_FIX_MEGA_MOE_MEMORY": "1",
+            "SGLANG_OPT_USE_JIT_EP_ACTIVATION": "1",
             "SGLANG_OPT_DEEPGEMM_MEGA_MOE_NUM_MAX_TOKENS_PER_RANK": "4096",
             "SGLANG_OPT_FIX_NEXTN_MEGA_MOE": "1",
             "SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK": "0",
+            "SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2": "1",
         }.items():
             os.environ[k] = v
         deepep_config = (
@@ -98,23 +100,42 @@ def run(args: argparse.Namespace,
             "enable_dp_attention": True,
             "moe_a2a_backend": "deepep",
             "deepep_config": deepep_config,
-            "chunked_prefill_size": 32768,
+            "chunked_prefill_size": (
+                args.chunked_prefill_size
+                if args.chunked_prefill_size is not None
+                else 32768
+            ),
         }
+        if args.moe_dense_tp_size is not None:
+            parallel_kwargs["moe_dense_tp_size"] = args.moe_dense_tp_size
+        if args.enable_dp_lm_head:
+            parallel_kwargs["enable_dp_lm_head"] = True
+        if args.deepep_mode is not None:
+            parallel_kwargs["deepep_mode"] = args.deepep_mode
     else:
         parallel_kwargs = {
             "tp_size": args.tp,
             "moe_runner_backend": getattr(args, "moe_runner_backend", "flashinfer_mxfp4"),
             "disable_flashinfer_autotune": True,
-            "chunked_prefill_size": 8192,
+            "chunked_prefill_size": (
+                args.chunked_prefill_size
+                if args.chunked_prefill_size is not None
+                else 8192
+            ),
         }
         if args.ep > 1:
             parallel_kwargs["ep_size"] = args.ep
 
+    max_running_requests = (
+        args.max_running_requests
+        if args.max_running_requests is not None
+        else args.batch_size
+    )
     engine_kwargs: Dict[str, Any] = dict(
         model_path=args.model,
         trust_remote_code=args.trust_remote_code,
         disable_radix_cache=True,
-        max_running_requests=args.batch_size,
+        max_running_requests=max_running_requests,
         mem_fraction_static=args.mem_fraction_static,
         swa_full_tokens_ratio=0.1,
         context_length=args.max_model_len,
@@ -128,6 +149,12 @@ def run(args: argparse.Namespace,
         engine_kwargs["disable_cuda_graph"] = True
     if args.cuda_graph_max_bs is not None:
         engine_kwargs["cuda_graph_max_bs"] = args.cuda_graph_max_bs
+    if args.cpu_offload_gb > 0:
+        engine_kwargs["cpu_offload_gb"] = args.cpu_offload_gb
+    if args.kv_cache_dtype is not None:
+        engine_kwargs["kv_cache_dtype"] = args.kv_cache_dtype
+    if args.quantization is not None:
+        engine_kwargs["quantization"] = args.quantization
 
     print(f"[sglang_offline] Engine kwargs: {engine_kwargs}")
     print(f"[sglang_offline] SamplingParams: {sampling_params}")

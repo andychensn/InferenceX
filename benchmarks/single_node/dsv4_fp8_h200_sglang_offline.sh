@@ -59,7 +59,24 @@ SGLANG_CUDA_GRAPH_FLAG=()
 if [[ "${SGLANG_DISABLE_CUDA_GRAPH:-true}" == "true" ]]; then
     SGLANG_CUDA_GRAPH_FLAG=(--disable-cuda-graph)
 fi
-SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.85}"
+SGLANG_CHUNKED_PREFILL_SIZE="${SGLANG_CHUNKED_PREFILL_SIZE:-32768}"
+SGLANG_MAX_RUNNING_REQUESTS="${SGLANG_MAX_RUNNING_REQUESTS:-$CONC}"
+DPA_ENGINE_ARGS=()
+
+# H200 cannot fit the DeepSeek-V4-Pro FP8 SGLang EP+DPA weight layout with
+# useful KV/runtime headroom fully resident on GPU. Keep EP+DPA and offload a
+# small slice of early-layer weights so scheduler initialization can complete.
+if [[ "${DP_ATTENTION}" == "true" ]]; then
+    SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.94}"
+    SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-16}"
+    DPA_ENGINE_ARGS=(--moe-dense-tp-size 1 --enable-dp-lm-head --deepep-mode normal)
+    export SGLANG_OPT_USE_JIT_EP_ACTIVATION=1
+    export SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2=1
+    export SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK=1
+else
+    SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.85}"
+    SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-0}"
+fi
 start_gpu_monitor --output "$PWD/gpu_metrics.csv"
 
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$PWD"
@@ -76,6 +93,11 @@ PYTHONNOUSERSITE=1 python3 utils/bench_offline/run_offline.py \
     --moe-runner-backend marlin \
     "${SGLANG_CUDA_GRAPH_FLAG[@]}" \
     --mem-fraction-static "$SGLANG_MEM_FRACTION_STATIC" \
+    --chunked-prefill-size "$SGLANG_CHUNKED_PREFILL_SIZE" \
+    --max-running-requests "$SGLANG_MAX_RUNNING_REQUESTS" \
+    --cpu-offload-gb "$SGLANG_CPU_OFFLOAD_GB" \
+    --kv-cache-dtype fp8_e4m3 \
+    --quantization fp8 \
     --temperature 1.0 \
     --infinitebench-input-len "$ISL" \
     --infinitebench-output-len 256 \
@@ -83,6 +105,7 @@ PYTHONNOUSERSITE=1 python3 utils/bench_offline/run_offline.py \
     --result-dir "$PWD/" \
     --result-filename "$RESULT_FILENAME" \
     --metadata "benchmark_input_len=$ISL" "benchmark_output_len=256" \
+    "${DPA_ENGINE_ARGS[@]}" \
     "${DPA_FLAG[@]}"
 set +x
 

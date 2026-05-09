@@ -109,10 +109,27 @@ def main() -> None:
                         choices=["chat", "thinking"])
     parser.add_argument("--moe-runner-backend", default="flashinfer_mxfp4",
                         help="SGLang MoE runner backend (flashinfer_mxfp4 for FP4/Blackwell, marlin for FP8/Hopper)")
+    parser.add_argument("--moe-dense-tp-size", type=int, default=None,
+                        help="SGLang dense MoE TP size for DP-attention layouts.")
+    parser.add_argument("--enable-dp-lm-head", action="store_true",
+                        help="Enable SGLang DP LM head for DP-attention layouts.")
+    parser.add_argument("--deepep-mode", default=None,
+                        choices=["auto", "normal", "low_latency"],
+                        help="SGLang DeepEP mode.")
+    parser.add_argument("--cpu-offload-gb", type=int, default=0,
+                        help="SGLang CPU offload budget in GiB.")
+    parser.add_argument("--kv-cache-dtype", default=None,
+                        help="SGLang KV cache dtype.")
+    parser.add_argument("--quantization", default=None,
+                        help="SGLang quantization mode.")
     parser.add_argument("--disable-cuda-graph", action="store_true",
                         help="Disable SGLang CUDA graph capture.")
     parser.add_argument("--cuda-graph-max-bs", type=int, default=None,
                         help="Maximum SGLang batch size to capture with CUDA graphs.")
+    parser.add_argument("--chunked-prefill-size", type=int, default=None,
+                        help="SGLang chunked prefill size.")
+    parser.add_argument("--max-running-requests", type=int, default=None,
+                        help="SGLang max running requests.")
     parser.add_argument("--mem-fraction-static", type=float, default=0.85,
                         help="SGLang static memory fraction.")
     parser.add_argument("--trust-remote-code", action="store_true", default=True)
