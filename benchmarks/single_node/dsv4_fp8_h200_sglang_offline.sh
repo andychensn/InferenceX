@@ -67,11 +67,13 @@ MOE_RUNNER_ARGS=(--moe-runner-backend marlin)
 # H200 cannot use the DeepEP+DeepGEMM FP4 path for DSV4 because that FP4 recipe
 # is Blackwell-only. It also cannot fit the converted-FP8 expert layout. Keep
 # the native MXFP4 expert layout and use Marlin with the standard EP path.
+# Use full DP-attn so attention TP is 1; DSV4 attention cannot short-circuit
+# TP allreduce safely when standard EP leaves some DP/TP shards empty.
 if [[ "${DP_ATTENTION}" == "true" ]]; then
     SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.85}"
     SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-0}"
     DPA_ENGINE_ARGS=(
-        --dpa-size 2
+        --dpa-size 8
         --dpa-moe-a2a-backend none
         --dpa-moe-runner-backend marlin
         --sglang-dpa-env-preset none
