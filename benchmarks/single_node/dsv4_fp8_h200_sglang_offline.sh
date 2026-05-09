@@ -101,13 +101,13 @@ PY
 }
 
 # Keep DP-attn at size 2 so the dense replicated state is smaller on H200. Use
-# the FP8 Triton MoE path with A2A disabled. H200 still lands within about 1 GiB
-# of capacity during FP8 MoE weight construction, so offload a small slice of
+# the FP8 Triton MoE path with A2A disabled. H200 still lands close to capacity
+# during FP8 MoE weight construction, so offload a small slice of
 # weights to keep EP+DPA resident enough to start. Patch SGLang's empty attention
 # shards so zero-token DPA ranks still enter the all-reduce instead of hanging.
 if [[ "${DP_ATTENTION}" == "true" ]]; then
     SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.85}"
-    SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-8}"
+    SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-16}"
     DPA_ENGINE_ARGS=(
         --dpa-size 2
         --dpa-moe-a2a-backend none
