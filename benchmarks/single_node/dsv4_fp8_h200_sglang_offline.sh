@@ -80,9 +80,13 @@ old = """        if not get_attn_tp_context().input_scattered and x.shape[0] == 
 """
 new = """        if not get_attn_tp_context().input_scattered and x.shape[0] == 0:
             if self.wo_b.reduce_results:
-                empty_o = x.new_empty((0, self.n_local_groups * self.o_lora_rank))
-                o, _ = self.wo_b(empty_o)
-                return o
+                from sglang.srt.layers.dp_attention import get_attention_tp_group
+
+                output = x.new_empty((0, self.hidden_size))
+                torch.distributed.all_reduce(
+                    output, group=get_attention_tp_group().device_group
+                )
+                return output
             return x
 """
 
