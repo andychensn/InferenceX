@@ -64,21 +64,55 @@ SGLANG_MAX_RUNNING_REQUESTS="${SGLANG_MAX_RUNNING_REQUESTS:-$CONC}"
 DPA_ENGINE_ARGS=()
 MOE_RUNNER_ARGS=(--moe-runner-backend marlin)
 
+patch_sglang_dsv4_empty_attn_allreduce() {
+    PYTHONNOUSERSITE=1 python3 - <<'PY'
+from pathlib import Path
+
+import sglang.srt.models.deepseek_v4 as deepseek_v4
+
+path = Path(deepseek_v4.__file__)
+text = path.read_text()
+old = """        if not get_attn_tp_context().input_scattered and x.shape[0] == 0:
+            assert (
+                not self.wo_b.reduce_results
+            ), "short-circuiting allreduce will lead to hangs"
+            return x
+"""
+new = """        if not get_attn_tp_context().input_scattered and x.shape[0] == 0:
+            if self.wo_b.reduce_results:
+                empty_o = x.new_empty((0, self.n_groups * self.o_lora_rank))
+                o, _ = self.wo_b(empty_o)
+                return o
+            return x
+"""
+
+if new in text:
+    print(f"[dsv4-sglang-patch] Already patched {path}")
+elif old in text:
+    path.write_text(text.replace(old, new))
+    print(f"[dsv4-sglang-patch] Patched {path}")
+else:
+    raise RuntimeError(f"Unable to patch DSV4 empty attention allreduce in {path}")
+PY
+}
+
 # H200 cannot use the DeepEP+DeepGEMM FP4 path for DSV4 because that FP4 recipe
 # is Blackwell-only. It also cannot fit the converted-FP8 expert layout. Keep
 # the native MXFP4 expert layout and use Marlin with the standard EP path.
-# Use full DP-attn so attention TP is 1; DSV4 attention cannot short-circuit
-# TP allreduce safely when standard EP leaves some DP/TP shards empty.
+# Keep DP-attn at size 2 so the model fits on H200, and patch SGLang so empty
+# attention TP shards still participate in the output allreduce instead of
+# asserting when a DP shard receives no tokens.
 if [[ "${DP_ATTENTION}" == "true" ]]; then
-    SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.80}"
+    SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.85}"
     SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-0}"
     DPA_ENGINE_ARGS=(
-        --dpa-size 8
+        --dpa-size 2
         --dpa-moe-a2a-backend none
         --dpa-moe-runner-backend marlin
         --sglang-dpa-env-preset none
     )
     MOE_RUNNER_ARGS=()
+    patch_sglang_dsv4_empty_attn_allreduce
     export SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK=1
     export SGLANG_DSV4_FP4_EXPERTS=1
 else
