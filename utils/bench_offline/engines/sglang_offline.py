@@ -115,7 +115,7 @@ def run(args: argparse.Namespace,
         trust_remote_code=args.trust_remote_code,
         disable_radix_cache=True,
         max_running_requests=args.batch_size,
-        mem_fraction_static=0.85,
+        mem_fraction_static=args.mem_fraction_static,
         swa_full_tokens_ratio=0.1,
         context_length=args.max_model_len,
         skip_tokenizer_init=False,
@@ -124,6 +124,10 @@ def run(args: argparse.Namespace,
         **parallel_kwargs,
         **spec_kwargs,
     )
+    if args.disable_cuda_graph:
+        engine_kwargs["disable_cuda_graph"] = True
+    if args.cuda_graph_max_bs is not None:
+        engine_kwargs["cuda_graph_max_bs"] = args.cuda_graph_max_bs
 
     print(f"[sglang_offline] Engine kwargs: {engine_kwargs}")
     print(f"[sglang_offline] SamplingParams: {sampling_params}")

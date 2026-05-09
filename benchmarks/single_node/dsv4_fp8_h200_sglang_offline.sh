@@ -23,12 +23,43 @@ if [[ "$MODEL" != /* ]]; then
     hf download "$MODEL"
 fi
 
+# SGLang's tokenizer manager still routes through Transformers AutoTokenizer,
+# which rejects DeepSeek-V4-Pro's `model_type: deepseek_v4` in this image.
+# Keep the V4 architecture so SGLang dispatches to its native DSv4 model.
+python3 - "$MODEL" <<'PYEOF'
+import json
+import sys
+from pathlib import Path
+
+model = sys.argv[1]
+if model.startswith("/"):
+    path = Path(model) / "config.json"
+else:
+    from huggingface_hub import hf_hub_download
+    path = Path(hf_hub_download(repo_id=model, filename="config.json"))
+
+with open(path) as f:
+    config = json.load(f)
+if config.get("model_type") == "deepseek_v4":
+    config["model_type"] = "deepseek_v3"
+    with open(path, "w") as f:
+        json.dump(config, f, indent=2)
+    print(f"Patched {path}: model_type deepseek_v4 -> deepseek_v3")
+else:
+    print(f"No patch needed: model_type is {config.get('model_type')!r}")
+PYEOF
+
 nvidia-smi
 
 NUM_SPEC_TOKENS="$(dsv4_mtp_spec_tokens_for_spec_decoding)"
 EP_SIZE="${EP_SIZE:-1}"
 DPA_FLAG=()
 [[ "${DP_ATTENTION}" == "true" ]] && DPA_FLAG=(--dp-attn)
+SGLANG_CUDA_GRAPH_FLAG=()
+if [[ "${SGLANG_DISABLE_CUDA_GRAPH:-true}" == "true" ]]; then
+    SGLANG_CUDA_GRAPH_FLAG=(--disable-cuda-graph)
+fi
+SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.85}"
 start_gpu_monitor --output "$PWD/gpu_metrics.csv"
 
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$PWD"
@@ -43,6 +74,8 @@ PYTHONNOUSERSITE=1 python3 utils/bench_offline/run_offline.py \
     --max-model-len "$MAX_MODEL_LEN" \
     --mtp "$NUM_SPEC_TOKENS" \
     --moe-runner-backend marlin \
+    "${SGLANG_CUDA_GRAPH_FLAG[@]}" \
+    --mem-fraction-static "$SGLANG_MEM_FRACTION_STATIC" \
     --temperature 1.0 \
     --infinitebench-input-len "$ISL" \
     --infinitebench-output-len 256 \

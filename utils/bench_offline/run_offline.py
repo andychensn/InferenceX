@@ -109,6 +109,12 @@ def main() -> None:
                         choices=["chat", "thinking"])
     parser.add_argument("--moe-runner-backend", default="flashinfer_mxfp4",
                         help="SGLang MoE runner backend (flashinfer_mxfp4 for FP4/Blackwell, marlin for FP8/Hopper)")
+    parser.add_argument("--disable-cuda-graph", action="store_true",
+                        help="Disable SGLang CUDA graph capture.")
+    parser.add_argument("--cuda-graph-max-bs", type=int, default=None,
+                        help="Maximum SGLang batch size to capture with CUDA graphs.")
+    parser.add_argument("--mem-fraction-static", type=float, default=0.85,
+                        help="SGLang static memory fraction.")
     parser.add_argument("--trust-remote-code", action="store_true", default=True)
     parser.add_argument("--tokenizer-mode", default="deepseek_v4",
                         help="Passed to vllm.get_tokenizer; use 'deepseek_v4' "
