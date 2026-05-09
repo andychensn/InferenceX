@@ -2799,7 +2799,7 @@ dsv4-fp8-h200-sglang-offline:
     - isl: 8192
       osl: 256
       search-space:
-      - { tp: 8, ep: 8, conc-start: 2, conc-end: 128, spec-decoding: offline }
+      - { tp: 8, ep: 1, conc-start: 2, conc-end: 128, spec-decoding: offline }
 
   # DeepSeek-V4-Pro B300 single-node aggregate recipe from the submitted B300
   # pareto sweep. The single-node schema has no explicit data-parallel-size
