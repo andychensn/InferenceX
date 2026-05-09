@@ -69,12 +69,19 @@ MOE_RUNNER_ARGS=(--moe-runner-backend marlin)
 # small slice of early-layer weights so scheduler initialization can complete.
 # FlashInfer TRTLLM's standard-a2a paths are not usable here: the non-routed
 # path expects bypassed top-k output, and the routed path rejects DeepSeek-V4's
-# routed-scaling HashTopK. Keep DeepEP, but force BF16 dispatch so H200 avoids
-# the FP8 packed-scale DeepGEMM communication path that is Blackwell-only.
+# routed-scaling HashTopK. Use SGLang's W4A8 CUTLASS DeepEP-normal path so H200
+# avoids DeepGEMM's FP4/packed-scale path that is Blackwell-only.
 if [[ "${DP_ATTENTION}" == "true" ]]; then
     SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.94}"
     SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-16}"
-    DPA_ENGINE_ARGS=(--moe-dense-tp-size 1 --enable-dp-lm-head --deepep-mode normal --sglang-dpa-env-preset fp8)
+    DPA_ENGINE_ARGS=(
+        --moe-dense-tp-size 1
+        --enable-dp-lm-head
+        --deepep-mode normal
+        --sglang-dpa-env-preset fp8
+        --quantization w4afp8
+        --dpa-moe-runner-backend cutlass
+    )
     MOE_RUNNER_ARGS=()
     export SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK=1
     export SGLANG_DEEPEP_BF16_DISPATCH=1
