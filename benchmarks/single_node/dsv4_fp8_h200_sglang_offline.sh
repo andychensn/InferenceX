@@ -101,12 +101,13 @@ PY
 }
 
 # Keep DP-attn at size 2 so the dense replicated state is smaller on H200. Use
-# the FP8 Triton MoE path with A2A disabled while we isolate the EP+DPA failure.
-# Patch SGLang's empty attention shards so zero-token DPA ranks still enter the
-# all-reduce instead of hanging.
+# the FP8 Triton MoE path with A2A disabled. H200 still lands within about 1 GiB
+# of capacity during FP8 MoE weight construction, so offload a small slice of
+# weights to keep EP+DPA resident enough to start. Patch SGLang's empty attention
+# shards so zero-token DPA ranks still enter the all-reduce instead of hanging.
 if [[ "${DP_ATTENTION}" == "true" ]]; then
     SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.85}"
-    SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-0}"
+    SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-8}"
     DPA_ENGINE_ARGS=(
         --dpa-size 2
         --dpa-moe-a2a-backend none
@@ -119,6 +120,7 @@ if [[ "${DP_ATTENTION}" == "true" ]]; then
     patch_sglang_dsv4_empty_attn_allreduce
     export SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK=1
     export SGLANG_DSV4_FP4_EXPERTS=false
+    export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 else
     SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.85}"
     SGLANG_CPU_OFFLOAD_GB="${SGLANG_CPU_OFFLOAD_GB:-0}"
