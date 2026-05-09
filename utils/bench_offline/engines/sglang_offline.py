@@ -124,6 +124,14 @@ def run(args: argparse.Namespace,
         if args.max_running_requests is not None
         else args.batch_size
     )
+    if args.dp_attn:
+        dp_size = int(parallel_kwargs["dp_size"])
+        if max_running_requests < dp_size:
+            print(
+                "[sglang_offline] Raising max_running_requests from "
+                f"{max_running_requests} to {dp_size} for DP-attn."
+            )
+            max_running_requests = dp_size
     engine_kwargs: Dict[str, Any] = dict(
         model_path=args.model,
         trust_remote_code=args.trust_remote_code,
