@@ -70,7 +70,7 @@ backend:
       max-model-len: 16384
       max-num-seqs: 16
       max-cudagraph-capture-size: 2048
-      max-num-batched-tokens: 32768
+      max-num-batched-tokens: 16384
       trust-remote-code: true
       no-enable-prefix-caching: true
       no-enable-flashinfer-autotune: true
