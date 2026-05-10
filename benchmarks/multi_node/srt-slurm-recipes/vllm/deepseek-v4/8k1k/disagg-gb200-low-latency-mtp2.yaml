@@ -75,7 +75,7 @@ backend:
       data-parallel-rpc-port: 13345
       enable-expert-parallel: true
       enforce-eager: true
-      speculative-config: '{"method":"mtp","num_speculative_tokens":2}'
+      speculative-config: '{"method":"mtp","num_speculative_tokens":3}'
       attention-config: '{"use_fp4_indexer_cache":true}'
       max-model-len: 9280
       max-num-seqs: 8
@@ -96,7 +96,7 @@ backend:
       kv-cache-dtype: fp8
       tensor-parallel-size: 8
       pipeline-parallel-size: 1
-      speculative-config: '{"method":"mtp","num_speculative_tokens":2}'
+      speculative-config: '{"method":"mtp","num_speculative_tokens":3}'
       attention-config: '{"use_fp4_indexer_cache":true}'
       max-model-len: 9280
       max-num-seqs: 256
@@ -116,7 +116,7 @@ benchmark:
   type: sa-bench
   isl: 8192
   osl: 1024
-  concurrencies: 16x32x64
+  concurrencies: "16x32x64x512x2048"
   req_rate: inf
   use_chat_template: true
   custom_tokenizer: sa_bench_tokenizers.vllm_deepseek_v4.VLLMDeepseekV4Tokenizer

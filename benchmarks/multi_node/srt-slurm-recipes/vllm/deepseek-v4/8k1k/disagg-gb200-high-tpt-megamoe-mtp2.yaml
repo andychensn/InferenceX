@@ -84,7 +84,7 @@ backend:
       enable-ep-weight-filter: true
       moe-backend: deep_gemm_mega_moe
       enforce-eager: true
-      speculative-config: '{"method":"mtp","num_speculative_tokens":2}'
+      speculative-config: '{"method":"mtp","num_speculative_tokens":3}'
       attention-config: '{"use_fp4_indexer_cache":true}'
       max-model-len: 9280
       max-num-seqs: 16
@@ -110,7 +110,7 @@ backend:
       enable-expert-parallel: true
       enable-ep-weight-filter: true
       moe-backend: deep_gemm_mega_moe
-      speculative-config: '{"method":"mtp","num_speculative_tokens":2}'
+      speculative-config: '{"method":"mtp","num_speculative_tokens":3}'
       attention-config: '{"use_fp4_indexer_cache":true}'
       max-model-len: 9280
       max-num-seqs: 512
@@ -130,7 +130,7 @@ benchmark:
   type: "sa-bench"
   isl: 8192
   osl: 1024
-  concurrencies: "1024"
+  concurrencies: "1024x4096x8192x16384"
   req_rate: "inf"
   use_chat_template: true
   custom_tokenizer: "sa_bench_tokenizers.vllm_deepseek_v4.VLLMDeepseekV4Tokenizer"
