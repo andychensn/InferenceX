@@ -2291,3 +2291,10 @@
     - "Switch to the B300 SGLang MTP-capable image digest used by dsv4-fp4-b300-sglang-mtp"
     - "Propagate raw offline mtp metadata into aggregated benchmark results"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXXX
+
+- config-keys:
+    - dsv4-fp4-gb200-dynamo-sglang
+  description:
+    - "Add GB200 SGLang DeepSeek-V4-Pro 8k/256 srt-slurm recipes for conc 1, 512, 1024, 2048x4096, and 4096x8192"
+    - "Use GB200-specific recipe filenames so the shared DSV4 SGLang overlay does not shadow GB300 conc recipes"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXXX
