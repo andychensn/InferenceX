@@ -8375,7 +8375,7 @@ dsv4-fp4-b300-dynamo-vllm-mtp3:
           tp: 8
           ep: 8
           dp-attn: true
-      - conc-list: [8192, 16384]
+      - conc-list: [16384]
         spec-decoding: mtp
         prefill:
           num-worker: 2
@@ -8389,10 +8389,10 @@ dsv4-fp4-b300-dynamo-vllm-mtp3:
           tp: 8
           ep: 8
           dp-attn: true
-      - conc-list: [8192, 16384]
+      - conc-list: [16384]
         spec-decoding: mtp
         prefill:
-          num-worker: 2
+          num-worker: 1
           tp: 4
           ep: 4
           dp-attn: true
