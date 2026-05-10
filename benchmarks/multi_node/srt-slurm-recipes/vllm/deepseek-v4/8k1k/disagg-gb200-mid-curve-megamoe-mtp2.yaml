@@ -82,7 +82,7 @@ backend:
       enable-ep-weight-filter: true
       moe-backend: deep_gemm_mega_moe
       enforce-eager: true
-      speculative-config: '{"method":"mtp","num_speculative_tokens":3}'
+      speculative-config: '{"method":"mtp","num_speculative_tokens":1}'
       attention-config: '{"use_fp4_indexer_cache":true}'
       max-model-len: 9280
       max-num-seqs: 8
@@ -109,7 +109,7 @@ backend:
       enable-expert-parallel: true
       enable-ep-weight-filter: true
       moe-backend: deep_gemm_mega_moe
-      speculative-config: '{"method":"mtp","num_speculative_tokens":3}'
+      speculative-config: '{"method":"mtp","num_speculative_tokens":1}'
       attention-config: '{"use_fp4_indexer_cache":true}'
       max-model-len: 9280
       max-num-seqs: 512
