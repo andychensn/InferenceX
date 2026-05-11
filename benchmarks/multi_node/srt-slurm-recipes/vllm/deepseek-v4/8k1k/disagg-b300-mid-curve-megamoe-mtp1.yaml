@@ -1,7 +1,7 @@
 name: "svf-vllm-disagg-b300-mid-curve-megamoe-mtp1"
 
 # B300 MTP1 adaptation of the DSV4 vLLM disagg recipe. Prefill uses DEP8 and
-# decode keeps the PR 1304 topology, plus a dedicated NATS/etcd infra node.
+# decode keeps the PR 1304 topology with conservative MTP graph settings.
 model:
   path: "deepseek-v4-pro"
   container: "vllm/vllm-openai:v0.20.1"
@@ -98,13 +98,13 @@ backend:
       speculative-config: '{"method":"mtp","num_speculative_tokens":1}'
       max-model-len: 9280
       max-num-seqs: 512
-      max-cudagraph-capture-size: 2048
-      max-num-batched-tokens: 2048
+      max-cudagraph-capture-size: 512
+      max-num-batched-tokens: 512
       trust-remote-code: true
       no-enable-prefix-caching: true
       no-enable-flashinfer-autotune: true
       block-size: 256
-      compilation-config: '{"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"]}'
+      compilation-config: '{"cudagraph_mode":"FULL_DECODE_ONLY","mode":0}'
       gpu-memory-utilization: 0.85
       stream-interval: 50
       no-disable-hybrid-kv-cache-manager: true
