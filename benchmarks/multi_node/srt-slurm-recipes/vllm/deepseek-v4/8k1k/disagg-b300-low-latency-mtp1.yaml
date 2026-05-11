@@ -1,6 +1,6 @@
 name: "svf-vllm-disagg-b300-low-latency-mtp1"
 
-# B300 MTP1 adaptation of the DSV4 vLLM disagg recipe. Prefill uses DEP4 and
+# B300 MTP1 adaptation of the DSV4 vLLM disagg recipe. Prefill uses DEP8 and
 # decode keeps the PR 1304 topology, plus a dedicated NATS/etcd infra node.
 model:
   path: "deepseek-v4-pro"
@@ -27,7 +27,7 @@ resources:
   decode_nodes: 1
   prefill_workers: 1
   decode_workers: 1
-  gpus_per_prefill: 4
+  gpus_per_prefill: 8
   gpus_per_decode: 8
 
 infra:
@@ -61,7 +61,7 @@ backend:
       kv-cache-dtype: "fp8"
       tensor-parallel-size: 1
       pipeline-parallel-size: 1
-      data-parallel-size: 4
+      data-parallel-size: 8
       data-parallel-rpc-port: 13345
       enable-expert-parallel: true
       attention-config: '{"use_fp4_indexer_cache": true}'

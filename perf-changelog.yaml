@@ -2333,7 +2333,7 @@
     - dsv4-fp4-b300-dynamo-vllm-mtp1
   description:
     - "Add DeepSeek-V4-Pro FP4 B300 Dynamo vLLM MTP1 disaggregated multi-node coverage"
-    - "Use DEP4 prefill and enable vLLM speculative-config mtp with num_speculative_tokens=1 in both prefill and decode"
+    - "Use DEP8 prefill and enable vLLM speculative-config mtp with num_speculative_tokens=1 in both prefill and decode"
     - "Benchmark serving keeps the DeepSeek-V4 chat template path for MTP acceptance-rate correctness"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1307
 
