@@ -70,6 +70,14 @@ fi
 
 SPEC_CONFIG="{\"model\":\"${SPEC_DRAFT_MODEL}\",\"method\":\"eagle3\",\"num_speculative_tokens\":${SPEC_NUM_TOKENS},\"draft_tensor_parallel_size\":${SPEC_DRAFT_TP}}"
 
+PREFILL_ARGS=()
+if [[ "${ISL}" -ge 8192 ]]; then
+  PREFILL_ARGS+=(
+    --long-prefill-token-threshold 8192
+    --max-num-batched-tokens 16384
+  )
+fi
+
 # Start GPU monitoring (power, temperature, clocks every second)
 start_gpu_monitor
 
@@ -79,6 +87,7 @@ vllm serve $MODEL --port $PORT \
 $EP \
 --gpu-memory-utilization 0.90 \
 --max-model-len $MAX_MODEL_LEN \
+"${PREFILL_ARGS[@]}" \
 --no-enable-prefix-caching \
 --trust-remote-code \
 --mm-encoder-tp-mode data \
