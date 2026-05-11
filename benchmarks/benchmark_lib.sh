@@ -947,9 +947,10 @@ build_replay_cmd() {
     # the just-generated KV blocks at the cost of hash-id fidelity past
     # turn 0 — which is exactly what we want for benchmark numbers.
     #
-    # The scenario plugin locks: --cache-bust system_prefix,
+    # The scenario plugin locks: --cache-bust first_turn_prefix,
     # --num-dataset-entries 739, --inter-turn-delay-cap-seconds 60, etc.,
-    # so we do not pass those. See utils/aiperf/docs/tutorials/agentx-mvp.md.
+    # and auto-injects them — so we do not pass them. See
+    # utils/aiperf/docs/tutorials/agentx-mvp.md.
     local result_dir="$1"
     local duration="${DURATION:-1800}"
 
@@ -992,12 +993,6 @@ build_replay_cmd() {
     # ``min(cap, available)`` ceiling, not a target — see
     # semianalysis_cc_traces_weka.py).
     REPLAY_CMD+=" --num-dataset-entries 739"
-    # Required by the inferencex-agentx-mvp scenario (validator enforces
-    # cache_bust.target == system_prefix) but not auto-defaulted by it,
-    # so we pass it explicitly. Forces every recycled play of a trace to
-    # have a fresh prompt prefix so steady-state cache-hit rates don't
-    # inflate as the run progresses.
-    REPLAY_CMD+=" --cache-bust system_prefix"
     # 1-second timeslices on the server-metrics scrape so the post-run
     # plotter has per-window time series (KV usage, cache hit rate,
     # throughput, etc.). Matches kv-cache-tester's poll_interval=1.0
