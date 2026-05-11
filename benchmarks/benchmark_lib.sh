@@ -988,6 +988,13 @@ build_replay_cmd() {
     # CPU on minimax-m2.5 at high concurrency. Lossless for vLLM (server
     # usage is authoritative).
     REPLAY_CMD+=" --use-server-token-count"
+    # aiperf's dataset manager (separate from the inference parser) loads
+    # the model's tokenizer for trace-prompt tokenization regardless of
+    # --use-server-token-count. Models like kimi (amd/Kimi-K2.5-MXFP4,
+    # moonshotai/Kimi-K2.5) ship a custom tokenizer in their HF repo and
+    # need trust_remote_code=True to load. Benign for models without
+    # custom tokenizer code, so we set it unconditionally.
+    REPLAY_CMD+=" --tokenizer-trust-remote-code"
     # Default --num-dataset-entries is 100; the weka corpus has 739. Cap
     # at 739 so all unique traces are loaded (the loader treats this as a
     # ``min(cap, available)`` ceiling, not a target — see
