@@ -2343,3 +2343,63 @@
   description:
     - "Add Qwen3.5-397B-A17B FP8 MI355X ATOM benchmark configs with and without MTP"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1310
+
+- config-keys:
+    - dsr1-*-b200-sglang
+    - dsr1-*-b200-sglang-mtp
+    - dsr1-*-h200-sglang
+    - dsr1-*-b300-sglang
+    - dsr1-*-b300-sglang-mtp
+  description:
+    - "Update NVIDIA SGLang image from v0.5.9-cu130/v0.5.10.post1-cu130 to v0.5.11-cu130"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+
+- config-keys:
+    - qwen3.5-*-b300-sglang
+    - qwen3.5-*-b300-sglang-mtp
+    - qwen3.5-fp8-h200-sglang-mtp
+  description:
+    - "Update NVIDIA Qwen3.5 SGLang image from v0.5.10.post1-cu130/v0.5.10.post1 to v0.5.11-cu130/v0.5.11"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+
+- config-keys:
+    - glm5-*-b300-sglang
+    - glm5-*-b300-sglang-mtp
+    - glm5-*-b200-sglang
+    - glm5-*-b200-sglang-mtp
+  description:
+    - "Update NVIDIA GLM5 SGLang image from v0.5.10.post1-cu130 to v0.5.11-cu130"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+
+- config-keys:
+    - dsr1-*-mi300x-sglang
+    - dsr1-*-mi325x-sglang
+    - dsr1-*-mi355x-sglang
+  description:
+    - "Update AMD DSR1 SGLang image from v0.5.9-rocm700-mi3*x to v0.5.11-rocm700-mi3*x"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+
+- config-keys:
+    - qwen3.5-*-mi355x-sglang
+    - qwen3.5-*-mi355x-sglang-mtp
+    - glm5-*-mi355x-sglang
+    - glm5-*-mi355x-sglang-mtp
+    - glm5.1-*-mi355x-sglang
+  description:
+    - "Update AMD MI355X SGLang ROCm image from v0.5.10rc0-rocm720-mi35x to v0.5.11-rocm720-mi35x-20260511"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+
+- config-keys:
+    - qwen3.5-*-mi300x-sglang
+    - qwen3.5-*-mi325x-sglang
+  description:
+    - "Update AMD MI300X/MI325X SGLang image from v0.5.10-rocm720-mi30x to v0.5.11-rocm720-mi30x"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+
+- config-keys:
+    - kimik2.5-*-mi*-vllm
+    - minimaxm2.5-*-mi*-vllm
+    - gptoss-*-mi*-vllm
+  description:
+    - "Update AMD vLLM ROCm image from v0.16.0-v0.19.1 to v0.20.2"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
