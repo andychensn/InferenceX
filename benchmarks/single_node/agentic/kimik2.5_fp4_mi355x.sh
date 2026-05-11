@@ -62,6 +62,9 @@ OFFLOAD_ARGS=""
 case "$OFFLOADING" in
     none) ;;
     cpu)
+        # MI355X nodes have substantial DRAM; override workflow default (600 GB)
+        # so we offload up to 2 TB of KV cache.
+        TOTAL_CPU_DRAM_GB=2000
         export VLLM_USE_SIMPLE_KV_OFFLOAD=1
         OFFLOAD_ARGS="--kv_offloading_backend native --kv_offloading_size $TOTAL_CPU_DRAM_GB --disable-hybrid-kv-cache-manager"
         ;;
