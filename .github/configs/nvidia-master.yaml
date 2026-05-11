@@ -2402,7 +2402,7 @@ kimik2.5-int4-b200-vllm:
   image: vllm/vllm-openai:v0.19.1
   model: moonshotai/Kimi-K2.5
   model-prefix: kimik2.5
-  runner: b200
+  runner: b200-dgxc
   precision: int4
   framework: vllm
   multinode: false
