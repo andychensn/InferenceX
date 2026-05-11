@@ -1,4 +1,4 @@
-name: "disagg-gb300-4p1d-dep4-dep16-8-c1024"
+name: "disagg-gb300-1p1d-dep4-dep20-6-c1024"
 
 # 8k/1k high-throughput topology for the wideep DSV4-Pro setup.
 #
@@ -50,12 +50,12 @@ sbatch_directives:
 resources:
   gpu_type: "gb300"
   gpus_per_node: 4
-  prefill_nodes: 4
-  prefill_workers: 4
+  prefill_nodes: 1
+  prefill_workers: 1
   gpus_per_prefill: 4
-  decode_nodes: 4
+  decode_nodes: 5
   decode_workers: 1
-  gpus_per_decode: 16
+  gpus_per_decode: 20
 
 frontend:
   type: dynamo
@@ -180,9 +180,9 @@ backend:
       mem-fraction-static: 0.94
       swa-full-tokens-ratio: 0.056
       context-length: 8704
-      tensor-parallel-size: 16
-      data-parallel-size: 16
-      expert-parallel-size: 16
+      tensor-parallel-size: 20
+      data-parallel-size: 20
+      expert-parallel-size: 20
       enable-dp-attention: true
       enable-dp-lm-head: true
       max-running-requests: 21504
@@ -193,6 +193,6 @@ benchmark:
   type: "sa-bench"
   isl: 8192
   osl: 256
-  concurrencies: "8192"
+  concurrencies: "1024x2048"
   req_rate: "inf"
   use_chat_template: false

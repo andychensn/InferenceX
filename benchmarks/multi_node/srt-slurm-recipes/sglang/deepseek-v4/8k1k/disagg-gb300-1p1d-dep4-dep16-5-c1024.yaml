@@ -193,6 +193,6 @@ benchmark:
   type: "sa-bench"
   isl: 8192
   osl: 256
-  concurrencies: "2048x8192"
+  concurrencies: "2048"
   req_rate: "inf"
   use_chat_template: false
