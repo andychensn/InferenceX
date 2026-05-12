@@ -64,7 +64,7 @@ backend:
       data-parallel-size: 8
       data-parallel-rpc-port: 13345
       enable-expert-parallel: true
-      attention-config: '{"use_fp4_indexer_cache": true}'
+      attention-config: '{"use_fp4_indexer_cache": false}'
       enforce-eager: true
       speculative-config: '{"method":"mtp","num_speculative_tokens":1}'
       max-model-len: 16384
@@ -92,6 +92,7 @@ backend:
       kv-cache-dtype: "fp8"
       tensor-parallel-size: 8
       pipeline-parallel-size: 1
+      attention-config: '{"use_fp4_indexer_cache": false}'
       speculative-config: '{"method":"mtp","num_speculative_tokens":1}'
       max-model-len: 16384
       max-num-seqs: 256

@@ -8251,7 +8251,8 @@ dsv4-fp4-b300-dynamo-vllm-mtp1:
       osl: 1024
       search-space:
       # B300 MTP1 adaptation of the DSV4 Dynamo vLLM disagg recipes. Prefill
-      # uses DEP8; decode keeps the PR 1304 topology with MTP-safe graph settings.
+      # uses DEP8; decode keeps the PR 1304 topology with MTP-safe graph settings
+      # and disables the FP4 indexer cache to avoid the DeepGEMM metadata path.
       - conc-list: [1, 32, 64, 128]
         spec-decoding: mtp
         prefill:

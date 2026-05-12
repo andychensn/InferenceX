@@ -2352,3 +2352,10 @@
   description:
     - "Add Qwen3.5-397B-A17B FP8 MI355X ATOM benchmark configs with and without MTP"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1310
+
+- config-keys:
+    - dsv4-fp4-b300-dynamo-vllm-mtp1
+  description:
+    - "Disable the vLLM FP4 indexer cache in B300 MTP recipes to avoid the DeepGEMM context_lens.is_contiguous() failure"
+    - "Apply the setting to both prefill and decode so eval-only and throughput jobs take the non-DeepGEMM path"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1307

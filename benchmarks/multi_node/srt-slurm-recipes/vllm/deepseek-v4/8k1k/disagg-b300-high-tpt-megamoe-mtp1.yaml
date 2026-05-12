@@ -65,7 +65,7 @@ backend:
       data-parallel-rpc-port: 13345
       enable-expert-parallel: true
       enable-ep-weight-filter: true
-      attention-config: '{"use_fp4_indexer_cache": true}'
+      attention-config: '{"use_fp4_indexer_cache": false}'
       enforce-eager: true
       speculative-config: '{"method":"mtp","num_speculative_tokens":1}'
       max-model-len: 9280
@@ -94,7 +94,7 @@ backend:
       data-parallel-rpc-port: 13345
       enable-expert-parallel: true
       enable-ep-weight-filter: true
-      attention-config: '{"use_fp4_indexer_cache": true}'
+      attention-config: '{"use_fp4_indexer_cache": false}'
       speculative-config: '{"method":"mtp","num_speculative_tokens":1}'
       max-model-len: 9280
       max-num-seqs: 512
