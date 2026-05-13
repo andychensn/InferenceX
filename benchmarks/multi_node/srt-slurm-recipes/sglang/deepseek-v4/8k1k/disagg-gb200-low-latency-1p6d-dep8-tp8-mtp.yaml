@@ -94,6 +94,12 @@ backend:
       tool-call-parser: deepseekv4  # gates dsv4 chat-encoding spec.
 
       disaggregation-mode: "prefill"
+      # Pinned port: srt-slurm sa-submission-q2-2026 omits the
+      # --disaggregation-bootstrap-port arg, so each prefill node picks
+      # its own random port and the follower's register_to_bootstrap call
+      # hits a non-existent port on the leader. Pinning a fixed port
+      # forces both nodes to agree on it.
+      disaggregation-bootstrap-port: 30001
       disaggregation-transfer-backend: nixl
 
       tensor-parallel-size: 8

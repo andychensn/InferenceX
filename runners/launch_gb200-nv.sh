@@ -161,13 +161,18 @@ elif [[ $FRAMEWORK == "dynamo-vllm" && $MODEL_PREFIX == "dsv4" ]]; then
     mkdir -p recipes/vllm/deepseek-v4
     cp -rT "$GITHUB_WORKSPACE/benchmarks/multi_node/srt-slurm-recipes/vllm/deepseek-v4" recipes/vllm/deepseek-v4
 elif [[ $FRAMEWORK == "dynamo-sglang" && $MODEL_PREFIX == "dsv4" ]]; then
-    # Mirrors the dynamo-vllm dsv4 branch above: pin to the q2-2026
-    # NVIDIA srt-slurm (newer srtctl + dynamo-sglang container alias)
-    # and overlay our hand-rolled DSV4 sglang recipes. NVIDIA/srt-slurm
-    # has no upstream sglang DSV4 disagg recipes yet, hence the overlay.
+    # Pin to NVIDIA srt-slurm 'main' (same as the gb300-cw runner): it
+    # has the bootstrap-port planner that allocates a unified
+    # --disaggregation-bootstrap-port per multi-node prefill worker and
+    # passes it to every node of that worker. The older
+    # sa-submission-q2-2026 branch omits the arg, which causes each
+    # node to pick its own random port and the follower's
+    # register_to_bootstrap call fails (see runs 25785003012,
+    # 25812320128, 25828722503). Recipes are still overlaid because
+    # neither upstream branch ships our DSV4 MTP disagg recipes.
     git clone https://github.com/NVIDIA/srt-slurm.git "$SRT_REPO_DIR"
     cd "$SRT_REPO_DIR"
-    git checkout sa-submission-q2-2026
+    git checkout main
     mkdir -p recipes/sglang/deepseek-v4
     cp -rT "$GITHUB_WORKSPACE/benchmarks/multi_node/srt-slurm-recipes/sglang/deepseek-v4" recipes/sglang/deepseek-v4
 elif [[ $FRAMEWORK == "dynamo-vllm" ]]; then
