@@ -381,6 +381,6 @@ else
         --container-mounts=$GITHUB_WORKSPACE:$CONTAINER_MOUNT_DIR,$MODEL_PATH:$MODEL_PATH,$AIPERF_MMAP_CACHE_HOST_PATH:/aiperf_mmap_cache \
         --no-container-mount-home \
         --container-workdir=$CONTAINER_MOUNT_DIR \
-        --no-container-entrypoint --export=ALL,PORT=8888,AIPERF_DATASET_MMAP_CACHE_DIR=/aiperf_mmap_cache \
+        --no-container-entrypoint --export=ALL,PORT=8888,AIPERF_DATASET_MMAP_CACHE_DIR=/aiperf_mmap_cache,AIPERF_DATASET_MMAP_CACHE_ENABLED=false \
         bash "$BENCH_SCRIPT"
 fi
