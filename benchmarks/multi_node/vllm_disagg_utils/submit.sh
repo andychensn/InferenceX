@@ -141,6 +141,41 @@ if [[ -n "${SLURM_EXCLUDE_NODES:-}" ]]; then
     EXCLUDE_OPT=(--exclude "$SLURM_EXCLUDE_NODES")
 fi
 
+# Reuse an existing allocation (run job.slurm as an overlapping srun step).
+# This mode avoids creating a new sbatch allocation.
+if [[ -n "${SLURM_REUSE_JOBID:-}" ]]; then
+    REUSE_JOB_ID="$SLURM_REUSE_JOBID"
+    INLINE_PID_FILE="${BENCHMARK_LOGS_DIR}/slurm_job-${REUSE_JOB_ID}.pid"
+
+    srun_cmd=(
+        srun
+        --overlap
+        --jobid "$REUSE_JOB_ID"
+        -N "$NUM_NODES"
+        -n "$NUM_NODES"
+        "${NODELIST_OPT[@]}"
+        "${EXCLUDE_OPT[@]}"
+        --output "${BENCHMARK_LOGS_DIR}/slurm_job-${REUSE_JOB_ID}.out"
+        --error "${BENCHMARK_LOGS_DIR}/slurm_job-${REUSE_JOB_ID}.err"
+        bash "$(dirname "$0")/job.slurm"
+    )
+
+    "${srun_cmd[@]}" &
+    INLINE_PID=$!
+    echo "$INLINE_PID" > "$INLINE_PID_FILE"
+
+    # Smoke-check that srun started successfully.
+    sleep 1
+    if ! kill -0 "$INLINE_PID" 2>/dev/null; then
+        wait "$INLINE_PID" || true
+        echo "Error: Failed to start srun on existing job ${REUSE_JOB_ID}" >&2
+        exit 1
+    fi
+
+    echo "$REUSE_JOB_ID"
+    exit 0
+fi
+
 # Construct the sbatch command
 sbatch_cmd=(
     sbatch
