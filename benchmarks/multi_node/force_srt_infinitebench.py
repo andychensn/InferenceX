@@ -9,6 +9,7 @@ fields, then applies this patch to the runtime copy of the sa-bench client.
 from __future__ import annotations
 
 import sys
+import re
 from pathlib import Path
 
 
@@ -504,17 +505,20 @@ export SA_BENCH_TEMPERATURE=1.0
         --num-chips "$TOTAL_GPUS" \\
 ''',
     )
-    warmup_without_chat = '''        --trust-remote-code \\
-        "${CUSTOM_TOKENIZER_ARGS[@]}"
-
-    num_prompts='''
-    warmup_with_chat = '''        --trust-remote-code \\
-        "${CHAT_TEMPLATE_ARGS[@]}" \\
-        "${CUSTOM_TOKENIZER_ARGS[@]}"
-
-    num_prompts='''
-    if warmup_with_chat not in text:
-        text = replace_once(text, warmup_without_chat, warmup_with_chat, path)
+    trust_remote_code_without_chat = re.compile(
+        r'(?m)^(?P<indent>\s*)--trust-remote-code \\\n'
+        r'(?P=indent)"\$\{CUSTOM_TOKENIZER_ARGS\[@\]\}"'
+    )
+    text, replacements = trust_remote_code_without_chat.subn(
+        r'\g<indent>--trust-remote-code \\' + "\n"
+        r'\g<indent>"${CHAT_TEMPLATE_ARGS[@]}" \\' + "\n"
+        r'\g<indent>"${CUSTOM_TOKENIZER_ARGS[@]}"',
+        text,
+    )
+    if replacements == 0 and '"${CHAT_TEMPLATE_ARGS[@]}"' not in text:
+        raise RuntimeError(
+            f"Expected sa-bench trust-remote-code/custom-tokenizer block not found in {path}"
+        )
 
     path.write_text(text)
 
