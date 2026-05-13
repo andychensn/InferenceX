@@ -100,6 +100,7 @@ backend:
 
       enable-dp-attention: true
       enable-dp-lm-head: true
+      load-balance-method: "round_robin"
 
       moe-a2a-backend: "deepep"
       deepep-config: '{"normal_dispatch":{"num_sms":96},"normal_combine":{"num_sms":96}}'
