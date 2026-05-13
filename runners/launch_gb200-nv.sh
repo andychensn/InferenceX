@@ -186,6 +186,34 @@ fi
 
 python3 "$GITHUB_WORKSPACE/benchmarks/multi_node/force_srt_infinitebench.py" "$PWD"
 
+if [[ "$FRAMEWORK" == "dynamo-sglang" ]]; then
+    # The SGLang image has /sgl-workspace, so srt-slurm's dynamo.install
+    # path assumes Rust build tools are already on PATH. Install them in
+    # the setup script before the Dynamo source build starts.
+    DYNAMO_SGLANG_SETUP_SCRIPT="install-torchao-dynamo-build-deps.sh"
+    mkdir -p configs
+    cat > "configs/${DYNAMO_SGLANG_SETUP_SCRIPT}" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f /configs/install-torchao.sh ]; then
+    bash /configs/install-torchao.sh
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    if [ -d "${HOME}/.cargo/bin" ]; then
+        ln -sf "${HOME}"/.cargo/bin/* /usr/local/bin/
+    fi
+fi
+
+if ! command -v maturin >/dev/null 2>&1; then
+    python3 -m pip install --break-system-packages maturin
+fi
+EOF
+    chmod +x "configs/${DYNAMO_SGLANG_SETUP_SCRIPT}"
+fi
+
 echo "Installing srtctl..."
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
@@ -244,7 +272,7 @@ echo "Submitting job with srtctl..."
 sed -i "s/^name:.*/name: \"${RUNNER_NAME}\"/" "$CONFIG_FILE"
 
 if [[ "$FRAMEWORK" == "dynamo-sglang" ]]; then
-    SRTCTL_OUTPUT=$(srtctl apply -f "$CONFIG_FILE" --tags "gb200,${MODEL_PREFIX},${PRECISION},${ISL}x${OSL},infmax-$(date +%Y%m%d)" --setup-script install-torchao.sh 2>&1)
+    SRTCTL_OUTPUT=$(srtctl apply -f "$CONFIG_FILE" --tags "gb200,${MODEL_PREFIX},${PRECISION},${ISL}x${OSL},infmax-$(date +%Y%m%d)" --setup-script "${DYNAMO_SGLANG_SETUP_SCRIPT}" 2>&1)
 else
     SRTCTL_OUTPUT=$(srtctl apply -f "$CONFIG_FILE" --tags "gb200,${MODEL_PREFIX},${PRECISION},${ISL}x${OSL},infmax-$(date +%Y%m%d)" 2>&1)
 fi
