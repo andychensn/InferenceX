@@ -2348,4 +2348,4 @@
     - gptoss-fp4-h100-vllm
   description:
     - "Update vLLM image from v0.18.0 to v0.20.2"
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1334
