@@ -16,9 +16,6 @@ DURATION=${DURATION:-1800}
 MAX_DELAY=${MAX_DELAY:-60}
 ADVANCE_MIN=${ADVANCE_MIN:-0.0}
 ADVANCE_MAX=${ADVANCE_MAX:-0.7}
-if [ -z "${MAX_MODEL_LEN:-}" ] || [ "$MAX_MODEL_LEN" = "0" ]; then
-    MAX_MODEL_LEN=131072
-fi
 
 if [[ -n "${SLURM_JOB_ID:-}" ]]; then
     echo "JOB $SLURM_JOB_ID running on ${SLURMD_NODENAME:-unknown}"
@@ -58,7 +55,6 @@ vllm serve $MODEL \
 --port $PORT \
 --gpu-memory-utilization 0.95 \
 --tensor-parallel-size $TP \
---max-model-len $MAX_MODEL_LEN \
 --max-num-seqs $CONC \
 --reasoning-parser kimi_k2 \
 --tool-call-parser kimi_k2 \

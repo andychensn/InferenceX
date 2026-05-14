@@ -17,9 +17,6 @@ MAX_DELAY=${MAX_DELAY:-60}
 ADVANCE_MIN=${ADVANCE_MIN:-0.0}
 ADVANCE_MAX=${ADVANCE_MAX:-0.7}
 EP_SIZE=${EP_SIZE:-1}
-if [ -z "${MAX_MODEL_LEN:-}" ] || [ "$MAX_MODEL_LEN" = "0" ]; then
-    MAX_MODEL_LEN=131072
-fi
 
 if [[ -n "${SLURM_JOB_ID:-}" ]]; then
     echo "JOB $SLURM_JOB_ID running on ${SLURMD_NODENAME:-unknown}"
@@ -84,7 +81,6 @@ vllm serve $MODEL \
 --tensor-parallel-size=$TP \
 $EP \
 --gpu-memory-utilization 0.90 \
---max-model-len $MAX_MODEL_LEN \
 --block-size=1 \
 --trust-remote-code \
 --max-num-seqs $CONC \
