@@ -161,18 +161,21 @@ elif [[ $FRAMEWORK == "dynamo-vllm" && $MODEL_PREFIX == "dsv4" ]]; then
     mkdir -p recipes/vllm/deepseek-v4
     cp -rT "$GITHUB_WORKSPACE/benchmarks/multi_node/srt-slurm-recipes/vllm/deepseek-v4" recipes/vllm/deepseek-v4
 elif [[ $FRAMEWORK == "dynamo-sglang" && $MODEL_PREFIX == "dsv4" ]]; then
-    # Pin to NVIDIA srt-slurm 'main' (same as the gb300-cw runner): it
-    # has the bootstrap-port planner that allocates a unified
-    # --disaggregation-bootstrap-port per multi-node prefill worker and
-    # passes it to every node of that worker. The older
-    # sa-submission-q2-2026 branch omits the arg, which causes each
-    # node to pick its own random port and the follower's
-    # register_to_bootstrap call fails (see runs 25785003012,
-    # 25812320128, 25828722503). Recipes are still overlaid because
-    # neither upstream branch ships our DSV4 MTP disagg recipes.
+    # Mirrors the dynamo-vllm dsv4 branch above: pin to the q2-2026
+    # NVIDIA srt-slurm (newer srtctl + dynamo-sglang container alias)
+    # and overlay our hand-rolled DSV4 sglang recipes. NVIDIA/srt-slurm
+    # has no upstream sglang DSV4 disagg recipes yet, hence the overlay.
+    #
+    # Note: we previously tried switching to 'main' to pick up the
+    # bootstrap-port planner that the gb300-cw runner uses, but main's
+    # srtctl adds a preflight check that requires model.path to exist on
+    # the orchestrator node — our /mnt/numa1/... path is compute-node-
+    # local so preflight rejects every recipe (run 25829747645). Recipe-
+    # level 'disaggregation-bootstrap-port: 30001' pin in each disagg
+    # recipe provides the same fix without needing main.
     git clone https://github.com/NVIDIA/srt-slurm.git "$SRT_REPO_DIR"
     cd "$SRT_REPO_DIR"
-    git checkout main
+    git checkout sa-submission-q2-2026
     mkdir -p recipes/sglang/deepseek-v4
     cp -rT "$GITHUB_WORKSPACE/benchmarks/multi_node/srt-slurm-recipes/sglang/deepseek-v4" recipes/sglang/deepseek-v4
 elif [[ $FRAMEWORK == "dynamo-vllm" ]]; then
