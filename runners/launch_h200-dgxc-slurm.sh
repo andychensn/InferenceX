@@ -272,7 +272,7 @@ EOF
 else
 
     HF_HUB_CACHE_MOUNT="/models/gharunners/hf-hub-cache"
-    AIPERF_MMAP_CACHE_HOST_PATH="/models/gharunners/aiperf-cache"
+    AIPERF_MMAP_CACHE_HOST_PATH="/home/sa-shared/gharunners/ai-perf-cache"
     SQUASH_FILE="/data/gharunners/containers/$(echo "$IMAGE" | sed 's/[\/:@#]/_/g').sqsh"
 
     # Convert pyxis image format (nvcr.io#path) to docker format (nvcr.io/path) for enroot import

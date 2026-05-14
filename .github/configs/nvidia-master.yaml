@@ -2525,7 +2525,11 @@ kimik2.5-int4-h200-vllm:
   image: vllm/vllm-openai:v0.20.2
   model: moonshotai/Kimi-K2.5
   model-prefix: kimik2.5
-  runner: h200
+  # Pinned to h200-dgxc (NVIDIA DGX Cloud Slurm pool) so we hit a host with
+  # the /home/sa-shared/gharunners/ai-perf-cache mount where aiperf's
+  # content-addressed dataset mmap cache lives. Other h200 pools (cw, nb)
+  # don't have that mount and would re-materialize 65 GB to /tmp every job.
+  runner: h200-dgxc
   precision: int4
   framework: vllm
   multinode: false
