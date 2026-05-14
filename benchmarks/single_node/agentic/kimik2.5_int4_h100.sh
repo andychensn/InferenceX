@@ -59,6 +59,7 @@ vllm serve $MODEL \
 --reasoning-parser kimi_k2 \
 --tool-call-parser kimi_k2 \
 --compilation_config.pass_config.fuse_allreduce_rms true \
+--kv-cache-dtype fp8 \
 --trust-remote-code \
 $OFFLOAD_ARGS > "$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
