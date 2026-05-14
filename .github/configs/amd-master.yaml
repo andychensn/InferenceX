@@ -534,13 +534,15 @@ kimik2.5-fp4-mi355x-vllm:
       search-space:
       - { tp: 8, conc-start: 4, conc-end: 64 }
       - { tp: 4, conc-start: 4, conc-end: 64 }
+    # MI355X has 288 GB HBM per GPU (vs MI300X/MI325X smaller, comparable to
+    # B300). Extend the conc sweep upward to probe where the KV cliff sits
+    # with the larger HBM envelope. Restrict to tp=8 for this sweep to halve
+    # job count while still covering the main parallelism config.
     agentic-coding:
     - duration: 1800
       search-space:
-      - { tp: 4, offloading: none, conc-list: [1, 2, 4, 8, 16, 20, 24, 28, 32] }
-      - { tp: 8, offloading: none, conc-list: [1, 2, 4, 8, 16, 20, 24, 28, 32] }
-      - { tp: 4, offloading: cpu,  conc-list: [1, 2, 4, 8, 16, 20, 24, 28, 32] }
-      - { tp: 8, offloading: cpu,  conc-list: [1, 2, 4, 8, 16, 20, 24, 28, 32] }
+      - { tp: 8, offloading: none, conc-list: [1, 2, 4, 8, 16, 24, 32, 40, 48] }
+      - { tp: 8, offloading: cpu,  conc-list: [1, 2, 4, 8, 16, 24, 32, 40, 48] }
 
 kimik2.5-fp4-mi355x-atom:
   image: rocm/atom:rocm7.2.1-ubuntu24.04-pytorch2.9.1-atom0.1.2

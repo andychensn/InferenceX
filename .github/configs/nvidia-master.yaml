@@ -2522,7 +2522,7 @@ kimik2.5-int4-b300-vllm:
       - { tp: 4, ep: 1, conc-start: 4, conc-end: 64 }
 
 kimik2.5-int4-h200-vllm:
-  image: vllm/vllm-openai:v0.16.0
+  image: vllm/vllm-openai:v0.20.2
   model: moonshotai/Kimi-K2.5
   model-prefix: kimik2.5
   runner: h200
@@ -2539,6 +2539,40 @@ kimik2.5-int4-h200-vllm:
       osl: 1024
       search-space:
       - { tp: 8, conc-start: 4, conc-end: 64 }
+    # H200 has 141 GB HBM per GPU (smaller than B200's 192 GB); KV cliff
+    # arrives at lower conc, so the sweep tops out earlier than the Blackwell
+    # sibling.
+    agentic-coding:
+    - duration: 1800
+      search-space:
+      - { tp: 8, offloading: none, conc-list: [1, 2, 4, 8, 16, 24, 32] }
+      - { tp: 8, offloading: cpu,  conc-list: [1, 2, 4, 8, 16, 24, 32] }
+
+kimik2.5-int4-h100-vllm:
+  image: vllm/vllm-openai:v0.20.2
+  model: moonshotai/Kimi-K2.5
+  model-prefix: kimik2.5
+  runner: h100
+  precision: int4
+  framework: vllm
+  multinode: false
+  scenarios:
+    fixed-seq-len:
+    - isl: 1024
+      osl: 1024
+      search-space:
+      - { tp: 8, conc-start: 4, conc-end: 32 }
+    - isl: 8192
+      osl: 1024
+      search-space:
+      - { tp: 8, conc-start: 4, conc-end: 32 }
+    # H100 has 80 GB HBM per GPU (smallest in this set); the KV cliff arrives
+    # early. Sweep saturates conc=20 to keep total HBM headroom.
+    agentic-coding:
+    - duration: 1800
+      search-space:
+      - { tp: 8, offloading: none, conc-list: [1, 2, 4, 8, 12, 16, 20] }
+      - { tp: 8, offloading: cpu,  conc-list: [1, 2, 4, 8, 12, 16, 20] }
 
 kimik2.5-fp4-b200-vllm:
   # Same image as the INT4 sibling: v0.20.x carries the flashinfer fix that
@@ -2578,7 +2612,7 @@ kimik2.5-fp4-b200-vllm:
 # does not have a B300-specific recipe, so this config reuses the existing
 # Kimi-K2.5 FP4 B200 vLLM recipe as-is until B300-specific tuning is available.
 kimik2.5-fp4-b300-vllm:
-  image: vllm/vllm-openai:v0.19.0-cu130
+  image: vllm/vllm-openai:v0.20.2
   model: nvidia/Kimi-K2.5-NVFP4
   model-prefix: kimik2.5
   runner: b300
@@ -2597,6 +2631,13 @@ kimik2.5-fp4-b300-vllm:
       search-space:
       - { tp: 8, ep: 1, conc-start: 4, conc-end: 4 }
       - { tp: 4, ep: 1, conc-start: 4, conc-end: 64 }
+    # B300 has 288 GB HBM per GPU (vs B200's 192 GB) so the KV-cache cliff
+    # sits higher than B200's. Extend the conc sweep to probe up to 64.
+    agentic-coding:
+    - duration: 1800
+      search-space:
+      - { tp: 8, ep: 1, offloading: none, conc-list: [1, 2, 4, 8, 16, 32, 40, 48, 56, 64] }
+      - { tp: 8, ep: 1, offloading: cpu,  conc-list: [1, 2, 4, 8, 16, 32, 40, 48, 56, 64] }
 
 dsr1-fp8-b200-sglang-mtp:
   image: lmsysorg/sglang:v0.5.9-cu130
