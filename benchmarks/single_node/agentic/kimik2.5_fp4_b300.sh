@@ -36,11 +36,12 @@ OFFLOAD_ARGS=""
 case "$OFFLOADING" in
     none) ;;
     cpu)
-        # B300 NV nodes have ~3.0 TiB total host DRAM. 3000 GB left zero
-        # headroom for worker RSS and triggered silent VllmWorker deaths
-        # during connector init (same shape as DSv4 D' earlier). 2200 GB is
-        # the proven-good value from D''.
-        TOTAL_CPU_DRAM_GB=2200
+        # B300 NV nodes: RealMemory ~3.02 TiB; Slurm AllocMem cgroup caps each
+        # job at ~2.82 TiB (2965 GB). At 3 TB the offload pool + worker RSS
+        # exceeded the cgroup and workers OOM-killed silently (R2 saw 10/10
+        # cpu jobs die ~4 min into init). 2.5 TB leaves ~465 GB headroom
+        # inside the cgroup for vLLM worker RSS + page cache.
+        TOTAL_CPU_DRAM_GB=2500
         export VLLM_USE_SIMPLE_KV_OFFLOAD=1
         OFFLOAD_ARGS="--kv_offloading_backend native --kv_offloading_size $TOTAL_CPU_DRAM_GB --disable-hybrid-kv-cache-manager"
         ;;
