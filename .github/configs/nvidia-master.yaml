@@ -2638,12 +2638,10 @@ kimik2.5-fp4-b300-vllm:
       - { tp: 4, ep: 1, conc-start: 4, conc-end: 64 }
     # B300 has 288 GB HBM per GPU (vs B200's 192 GB) so the KV-cache cliff
     # sits higher than B200's. Extend the conc sweep to probe up to 64.
-    # NOTE: temporarily cpu-only for the R3 retry (R2 had `none` jobs running
-    # cleanly at 3 TB offload but `cpu` failed; this run retries cpu at the
-    # corrected 2.5 TB pool size). Restore both lines once cpu is validated.
     agentic-coding:
     - duration: 1800
       search-space:
+      - { tp: 8, ep: 1, offloading: none, conc-list: [1, 2, 4, 8, 16, 32, 40, 48, 56, 64] }
       - { tp: 8, ep: 1, offloading: cpu,  conc-list: [1, 2, 4, 8, 16, 32, 40, 48, 56, 64] }
 
 dsr1-fp8-b200-sglang-mtp:
