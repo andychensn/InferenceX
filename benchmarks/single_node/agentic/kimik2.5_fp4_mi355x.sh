@@ -64,8 +64,17 @@ case "$OFFLOADING" in
         # reserve 2.5 TB for the simple CPU offload connector (leaves
         # ~200 GB headroom for worker RSS / page cache / slurm cgroup).
         TOTAL_CPU_DRAM_GB=2500
+        # Pure TP (no DP-attn): single engine, world_size=TP.
+        # SimpleCPUOffloadConnector internally divides cpu_bytes_to_use by
+        # world_size, so pass the full TOTAL_CPU_DRAM_GB.
+        PER_ENGINE_BYTES=$((TOTAL_CPU_DRAM_GB * 1024 * 1024 * 1024))
+        # JSON form (rather than --kv_offloading_backend native shortcut) so
+        # we can pass lazy_offload=true. Eager mode (the shortcut default)
+        # can hit a popleft_n AssertionError in vllm/v1/core/kv_cache_utils.py
+        # at low/mid CONC; lazy defers the store path. Matches the H200
+        # Kimi int4 launcher which cleared 17/17 with this pattern.
         export VLLM_USE_SIMPLE_KV_OFFLOAD=1
-        OFFLOAD_ARGS="--kv_offloading_backend native --kv_offloading_size $TOTAL_CPU_DRAM_GB --disable-hybrid-kv-cache-manager"
+        OFFLOAD_ARGS="--kv-transfer-config {\"kv_connector\":\"SimpleCPUOffloadConnector\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{\"cpu_bytes_to_use\":$PER_ENGINE_BYTES,\"lazy_offload\":true}}"
         ;;
     *) echo "Error: unsupported OFFLOADING value '$OFFLOADING'" >&2; exit 1 ;;
 esac

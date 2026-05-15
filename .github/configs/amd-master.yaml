@@ -510,12 +510,11 @@ kimik2.5-int4-mi300x-vllm:
       - { tp: 8, conc-start: 4, conc-end: 64 }
 
 kimik2.5-fp4-mi355x-vllm:
-  # Nightly carrying vllm-project/vllm@20cac26b ("[Bug fix][KV Connector]
-  # add cpu_offload_blocks > 0 check before maybe_run_layer_kv_offload"),
-  # which enables SimpleCPUOffloadConnector on ROCm. Required for the
-  # cpu-offload sweep points to use the same offload path as the NVIDIA
-  # agentic-coding configs.
-  image: vllm/vllm-openai-rocm:nightly-51f22dcfd068fe8f1e3192da2a1e825b930223cf
+  # v0.21.0 (released 2026-05-14) supersedes the prior nightly pin
+  # (51f22dcf...) which was carrying the SimpleCPUOffloadConnector ROCm
+  # cpu_offload_blocks > 0 fix. v0.21.0 is much newer than that fix and
+  # includes all subsequent ROCm offload work.
+  image: vllm/vllm-openai-rocm:v0.21.0
   model: amd/Kimi-K2.5-MXFP4
   model-prefix: kimik2.5
   runner: mi355x
