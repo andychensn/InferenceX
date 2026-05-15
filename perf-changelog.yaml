@@ -2494,4 +2494,4 @@
     - "Update model to amd/DeepSeek-R1-0528-MXFP4-MTP-MoEFP4 (replaces Preview checkpoint)"
     - "Consolidate to tp=4 for best perf; improves tput/GPU by +9% to +32%"
     - "Ref ATOM upstream benchmark run https://github.com/ROCm/ATOM/actions/runs/25686894636"
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/PLACEHOLDER
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1388
