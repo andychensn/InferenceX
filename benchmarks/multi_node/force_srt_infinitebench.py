@@ -244,8 +244,21 @@ def _load_init_kwargs(path: Path) -> dict:
     return init_kwargs
 
 
+_EMBEDDED_DEEPSEEK_V4_CHAT_TEMPLATE = (
+    "{%- if add_generation_prompt is not defined -%}{%- set add_generation_prompt = true -%}{%- endif -%}"
+    "{{- '<｜begin▁of▁sentence｜>' -}}"
+    "{%- for m in messages -%}"
+    "{%- if m['role'] == 'system' -%}{{- m['content'] -}}"
+    "{%- elif m['role'] == 'user' -%}<｜User｜>{{- m['content'] -}}"
+    "{%- elif m['role'] == 'assistant' -%}<｜Assistant｜>{{- m['content'] -}}<｜end▁of▁sentence｜>"
+    "{%- endif -%}"
+    "{%- endfor -%}"
+    "{%- if add_generation_prompt -%}<｜Assistant｜><think>{%- endif -%}"
+)
+
+
 def _attach_chat_template(tokenizer, model_path: Path):
-    candidates = [
+    file_candidates = [
         model_path / "chat_template.jinja",
         Path("/infmax-workspace")
         / "benchmarks"
@@ -253,11 +266,30 @@ def _attach_chat_template(tokenizer, model_path: Path):
         / "chat_templates"
         / "deepseek_v4_thinking.jinja",
     ]
-    for candidate in candidates:
+    for candidate in file_candidates:
         if candidate.exists():
             tokenizer.chat_template = candidate.read_text(encoding="utf-8")
             print(f"[sa-bench] Loaded DeepSeek-V4 chat template from {candidate}", flush=True)
-            break
+            return tokenizer
+
+    for cfg_name in ("chat_template.json", "tokenizer_config.json"):
+        cfg_path = model_path / cfg_name
+        if not cfg_path.exists():
+            continue
+        try:
+            with open(cfg_path, encoding="utf-8") as fin:
+                cfg = json.load(fin)
+        except (OSError, ValueError):
+            continue
+        chat_template = cfg.get("chat_template")
+        if isinstance(chat_template, str) and chat_template:
+            tokenizer.chat_template = chat_template
+            print(f"[sa-bench] Loaded DeepSeek-V4 chat template from {cfg_path}", flush=True)
+            return tokenizer
+
+    if not getattr(tokenizer, "chat_template", None):
+        tokenizer.chat_template = _EMBEDDED_DEEPSEEK_V4_CHAT_TEMPLATE
+        print("[sa-bench] Attached embedded DeepSeek-V4 chat template fallback", flush=True)
     return tokenizer
 
 
