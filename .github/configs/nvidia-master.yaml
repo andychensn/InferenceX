@@ -8820,9 +8820,9 @@ dsv4-fp4-gb300-dynamo-sglang-mtp3:
           tp: 16
           ep: 16
           dp-attn: true
-      # Mid curve 5p1d-dep8-dep8. 12 nodes. Conc halved 24576->12288 to drop failed-req rate (was 25.8%).
+      # Mid curve 5p1d-dep8-dep8. 12 nodes. Conc dropped 12288->8192 (~8k per decode worker — clean point).
       - spec-decoding: mtp
-        conc-list: [12288]
+        conc-list: [8192]
         prefill:
           num-worker: 5
           tp: 8
@@ -8835,9 +8835,9 @@ dsv4-fp4-gb300-dynamo-sglang-mtp3:
           tp: 8
           ep: 8
           dp-attn: true
-      # Mid curve 6p1d-dep8-dep8. 14 nodes. Conc halved 32768->16384 to drop failed-req rate (was 42.0%).
+      # Mid curve 6p1d-dep8-dep8. 14 nodes. Conc dropped 16384->8192 (~8k per decode worker — clean point).
       - spec-decoding: mtp
-        conc-list: [16384]
+        conc-list: [8192]
         prefill:
           num-worker: 6
           tp: 8
@@ -8865,10 +8865,9 @@ dsv4-fp4-gb300-dynamo-sglang-mtp3:
           tp: 8
           ep: 8
           dp-attn: true
-      # Mid curve 7p2d-dep8-dep8. 18 nodes. 2nd decode worker to raise decode capacity
-      # at conc 32768 (7p1d-dep8-dep8 alone hit 44.4% zero-output at the same conc).
+      # Mid curve 7p2d-dep8-dep8. 18 nodes. Conc dropped 32768->16384 (~8k per decode worker — clean point).
       - spec-decoding: mtp
-        conc-list: [32768]
+        conc-list: [16384]
         prefill:
           num-worker: 7
           tp: 8
@@ -8878,6 +8877,21 @@ dsv4-fp4-gb300-dynamo-sglang-mtp3:
           - "CONFIG_FILE=recipes/sglang/deepseek-v4/8k1k/disagg-mid-curve-8p1d-dep8-dep8-mtp-c65536.yaml"
         decode:
           num-worker: 2
+          tp: 8
+          ep: 8
+          dp-attn: true
+      # Mid curve 6p3d-dep8-dep8. 18 nodes. Conc 24576 = 3*8192 (~8k per decode worker — clean point).
+      - spec-decoding: mtp
+        conc-list: [24576]
+        prefill:
+          num-worker: 6
+          tp: 8
+          ep: 8
+          dp-attn: true
+          additional-settings:
+          - "CONFIG_FILE=recipes/sglang/deepseek-v4/8k1k/disagg-mid-curve-6p3d-dep8-dep8-mtp-c24576.yaml"
+        decode:
+          num-worker: 3
           tp: 8
           ep: 8
           dp-attn: true
