@@ -55,6 +55,14 @@ esac
 echo "Starting vllm server..."
 export TORCH_CUDA_ARCH_LIST="10.0"
 export PYTHONNOUSERSITE=1
+# Disable vLLM v0.21+ CUDA-graph memory estimator. Its pre-reservation
+# eats ~32% of HBM upfront which, combined with FP4 weights at TP=4
+# (~62 GB/GPU), leaves no room for KV blocks -- _check_enough_kv_cache_memory
+# trips before the engine starts. Our --gpu-memory-utilization=0.90 already
+# leaves ~18 GB/GPU slack outside vLLM's budget, which is the same safety
+# net the estimator provides, so disabling it is redundant rather than
+# unsafe.
+export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0
 
 vllm serve $MODEL \
 --host 0.0.0.0 \
