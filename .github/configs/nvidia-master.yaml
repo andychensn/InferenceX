@@ -8895,6 +8895,21 @@ dsv4-fp4-gb300-dynamo-sglang-mtp3:
           tp: 8
           ep: 8
           dp-attn: true
+      # Mid curve 5p2d-dep8-dep8. 14 nodes. Conc 12288 = 2*6144 (~6k per decode worker — below threshold).
+      - spec-decoding: mtp
+        conc-list: [12288]
+        prefill:
+          num-worker: 5
+          tp: 8
+          ep: 8
+          dp-attn: true
+          additional-settings:
+          - "CONFIG_FILE=recipes/sglang/deepseek-v4/8k1k/disagg-mid-curve-5p2d-dep8-dep8-mtp-c12288.yaml"
+        decode:
+          num-worker: 2
+          tp: 8
+          ep: 8
+          dp-attn: true
 
 # Mirror of dsv4-fp4-gb300-dynamo-sglang-mtp3 targeting the gb300-nv cluster instead
 # of gb300-cw. Single 5p2d-dep8-dep8 probe at conc 12288 (~6k per decode worker — well
