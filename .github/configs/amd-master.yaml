@@ -468,11 +468,10 @@ glm5.1-fp4-mi355x-sglang:
       - { tp: 2, conc-start: 4, conc-end: 256 }
       - { tp: 4, conc-start: 4, conc-end: 16 }
 
-# Diverged from glm5.1-fp4-mi355x-sglang (agentic-coding sibling). Metadata is
-# identical to origin/main's glm5.1-fp4-mi355x-sglang; the split exists because this
-# PR adds an agentic-coding scenarios block that differs from main
-# (either main had none or had a different conc/offload sweep).
-# The original glm5.1-fp4-mi355x-sglang entry stays byte-identical to origin/main.
+# Diverged from glm5.1-fp4-mi355x-sglang (agentic-coding sibling). Reasons below;
+# the original glm5.1-fp4-mi355x-sglang entry is left identical to origin/main so
+# its fixed-seq-len sweep is unaffected.
+#   - image: 'lmsysorg/sglang-rocm:v0.5.10rc0-rocm720-mi35x-20260415' -> 'lmsysorg/sglang-rocm:v0.5.12-rocm720-mi35x-20260517'
 glm5.1-fp4-mi355x-sglang-agentic:
   image: lmsysorg/sglang-rocm:v0.5.12-rocm720-mi35x-20260517
   model: amd/GLM-5.1-MXFP4
