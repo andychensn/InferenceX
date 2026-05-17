@@ -15,7 +15,7 @@ if [[ -n "$SLURM_JOB_ID" ]]; then
   echo "JOB $SLURM_JOB_ID running on $SLURMD_NODENAME"
 fi
 
-hf download "$MODEL"
+if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 
 # Start GPU monitoring (power, temperature, clocks every second)
 start_gpu_monitor
@@ -27,7 +27,7 @@ pip install datasets pandas
 if [ "$ISL" = "1024" ] && [ "$OSL" = "1024" ]; then
     CALCULATED_MAX_MODEL_LEN=$((ISL + OSL + 20))
 elif [ "$ISL" = "8192" ] || [ "$OSL" = "8192" ]; then
-    CALCULATED_MAX_MODEL_LEN=$((ISL + OSL + 200))
+    CALCULATED_MAX_MODEL_LEN=$((ISL + OSL + 256))
 else
     CALCULATED_MAX_MODEL_LEN=${MAX_MODEL_LEN:-10240}
 fi

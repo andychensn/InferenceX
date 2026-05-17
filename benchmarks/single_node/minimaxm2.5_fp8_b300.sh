@@ -23,12 +23,12 @@ fi
 
 nvidia-smi
 
-hf download "$MODEL"
+if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 
 SERVER_LOG=/workspace/server.log
 PORT=${PORT:-8888}
 
-export VLLM_FLASHINFER_ALLREDUCE_BACKEND=mnnvl
+export VLLM_FLOAT32_MATMUL_PRECISION=high
 
 if [ "$EP_SIZE" -gt 1 ]; then
   EP=" --enable-expert-parallel"

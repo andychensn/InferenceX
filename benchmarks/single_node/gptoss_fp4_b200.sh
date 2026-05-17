@@ -16,7 +16,7 @@ if [[ -n "$SLURM_JOB_ID" ]]; then
   echo "JOB $SLURM_JOB_ID running on $SLURMD_NODENAME"
 fi
 
-hf download "$MODEL"
+if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 
 nvidia-smi
 
@@ -24,7 +24,7 @@ nvidia-smi
 if [ "$ISL" = "1024" ] && [ "$OSL" = "1024" ]; then
     CALCULATED_MAX_MODEL_LEN=$((ISL + OSL + 20))
 elif [ "$ISL" = "8192" ] || [ "$OSL" = "8192" ]; then
-    CALCULATED_MAX_MODEL_LEN=$((ISL + OSL + 200))
+    CALCULATED_MAX_MODEL_LEN=$((ISL + OSL + 256))
 else
     CALCULATED_MAX_MODEL_LEN=${MAX_MODEL_LEN:-10240}
 fi
@@ -58,8 +58,7 @@ vllm serve $MODEL --host 0.0.0.0 --port $PORT \
 --config config.yaml \
 --gpu-memory-utilization 0.9 \
 --tensor-parallel-size $TP \
---max-num-seqs 512 \
---disable-log-requests > $SERVER_LOG 2>&1 &
+--max-num-seqs 512 > $SERVER_LOG 2>&1 &
 
 SERVER_PID=$!
 
