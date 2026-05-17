@@ -2524,3 +2524,9 @@
   description:
     - "Update vLLM ROCm image from v0.17.0 to v0.21.0"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1406
+
+- config-keys:
+    - kimik2.5-fp4-mi355x-vllm
+  description:
+    - "Update vLLM ROCm image from v0.18.0 to v0.21.0"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1407
