@@ -19,21 +19,16 @@ elif [[ $MODEL_PREFIX == "dsr1" && $PRECISION == "fp8" ]]; then
     export MODEL_PATH=/scratch/models/DeepSeek-R1-0528
     export SRT_SLURM_MODEL_PREFIX="dsr1-fp8"
 elif [[ $MODEL_PREFIX == "dsv4" && $PRECISION == "fp4" ]]; then
-    # DSv4-Pro weights live on the shared sa-shared Vast NFS storage;
-    # the /scratch/models/ node-local SSDs that hold DSR1 were never
-    # staged with DSv4.
-    #
-    # We use /data/home/sa-shared/... (not /home/sa-shared/...) because
-    # the two are different mount points for the SAME backing storage
-    # (storage-vip.vast.p03.globalai.run:/scratch/home/sa-shared mounted
-    # on /home/sa-shared, and :/scratch mounted on /data). The
-    # /home/sa-shared/ mount has shown a chronic ELOOP / "Too many
-    # levels of symbolic links" bug for workflow worker NFS sessions
-    # (R5 hit it on squash lockfiles; R7 hit it on the model path
-    # itself: Python's Path.resolve() returns ELOOP even though the
-    # path is a regular dir from interactive sessions). The /data/
-    # mount has a separate NFS client cache and so far isn't poisoned.
-    export MODEL_PATH=/data/home/sa-shared/models/DeepSeek-V4-Pro
+    # Use the node-local /scratch SSD for the 806 GB DSv4-Pro
+    # checkpoint. Faster than the Vast NFS path, but this dir only
+    # exists on compute nodes — the GHA runner pod's view does NOT
+    # have /scratch/models, so srtctl preflight (which stats the path
+    # from the runner pod) may fail with "Model alias resolved to
+    # /scratch/models/DeepSeek-V4-Pro, but that path is unavailable."
+    # If that happens, the next step is either to (a) patch srt-slurm
+    # to add a skip_model_preflight recipe field, or (b) stub a
+    # symlink on the runner pod that points at the NFS copy.
+    export MODEL_PATH=/scratch/models/DeepSeek-V4-Pro
     export SRT_SLURM_MODEL_PREFIX="deepseek-v4-pro"
 else
     echo "Unsupported model: $MODEL_PREFIX-$PRECISION. Supported models are: dsr1-fp4, dsr1-fp8, dsv4-fp4"
