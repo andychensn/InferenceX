@@ -1307,6 +1307,7 @@ minimaxm2.5-fp8-mi300x-vllm-disagg:
           dp-attn: false
           additional-settings:
           - "DECODE_NODES=2"
+          - "VLLM_MORIIO_CONNECTOR_READ_MODE=1"
 
 minimaxm2.5-fp8-mi325x-vllm-disagg:
   image: ghcr.io/simondanielsson/vllm/vllm-openai-rocm:fix-moriio-hangs-high-concurrency
@@ -1360,6 +1361,7 @@ minimaxm2.5-fp8-mi325x-vllm-disagg:
           dp-attn: false
           additional-settings:
           - "DECODE_NODES=2"
+          - "VLLM_MORIIO_CONNECTOR_READ_MODE=1"
 
 dsr1-fp4-mi355x-sglang-disagg:
   image: lmsysorg/sglang-rocm:v0.5.10.post1-rocm720-mi35x-20260501
