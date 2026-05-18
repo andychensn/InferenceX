@@ -2728,4 +2728,4 @@
     - glm5.1-fp4-mi355x-sglang-mtp
   description:
     - "Add MTP/EAGLE sibling of glm5.1-fp4-mi355x-sglang (model amd/GLM-5.1-MXFP4)"
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXX
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1494
