@@ -2762,3 +2762,10 @@
   description:
     - "Update TensorRT-LLM image (off: v1.2.0rc6.post2 109d / mtp: v1.2.0rc6.post3 102d) to v1.3.0rc14 (latest pre-release)"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1488
+
+- config-keys:
+    - dsr1-fp8-h200-trt
+    - dsr1-fp8-h200-trt-mtp
+  description:
+    - "Update TensorRT-LLM image from v1.1.0rc2.post2 (154d/124d old) to v1.3.0rc14 (latest pre-release)"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1487
