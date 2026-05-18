@@ -2741,3 +2741,9 @@
   description:
     - "Update vLLM image from v0.19.0-cu130 (26d old) to v0.21.0"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1454
+
+- config-keys:
+    - dsr1-fp8-mi300x-sglang
+  description:
+    - "Update SGLang image from v0.5.9-rocm700-mi30x to v0.5.12-rocm700-mi30x"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1425
