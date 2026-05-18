@@ -114,6 +114,15 @@ backend:
       enable-sleep-mode: true
       tokenizer-mode: deepseek_v4
 
+# Pass --mem=0 to every container worker srun. Without this, on clusters
+# with positive DefMemPerCPU (e.g. CW gb300: DefMemPerCPU=4096), the
+# per-task default is cpus_per_task × 4 GB = 4 GB per worker — wildly
+# insufficient for a vLLM worker mmap'ing multi-GB model weights. cgroup
+# OOM-kills the worker mid model load. --mem=0 = "all available node
+# memory" (~868 GB on CW gb300). See docs/config-reference.md#srun_options.
+srun_options:
+  mem: "0"
+
 benchmark:
   type: custom
   command: bash /infmax-workspace/benchmarks/multi_node/agentic_srt.sh
