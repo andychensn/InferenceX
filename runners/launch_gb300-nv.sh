@@ -73,7 +73,7 @@ if [[ "$IS_AGENTIC" == "1" ]]; then
     # Pin to HEAD as of when this landed; bump as upstream evolves.
     git clone https://github.com/NVIDIA/srt-slurm.git "$SRT_REPO_DIR"
     cd "$SRT_REPO_DIR"
-    git checkout 127597c0e6d3c1b3ffd7ac02dd0fea2d2fd62f74
+    git checkout 127597c2926467db06e6707e0aa9227261c6c02a
     mkdir -p recipes/vllm/deepseek-v4/agentic
     cp -rT "$GITHUB_WORKSPACE/benchmarks/multi_node/srt-slurm-recipes/vllm/deepseek-v4/agentic" \
         recipes/vllm/deepseek-v4/agentic

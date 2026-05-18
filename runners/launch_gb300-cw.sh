@@ -21,7 +21,7 @@ if [[ $MODEL_PREFIX == "dsv4" && $PRECISION == "fp4" ]]; then
         #   - default_bash_preamble (no more "Unknown field" warning)
         # Pin to HEAD as of when this landed; bump as upstream evolves.
         SRT_SLURM_RECIPES_REPO="https://github.com/NVIDIA/srt-slurm.git"
-        SRT_SLURM_RECIPES_REF="127597c0e6d3c1b3ffd7ac02dd0fea2d2fd62f74"
+        SRT_SLURM_RECIPES_REF="127597c2926467db06e6707e0aa9227261c6c02a"
         SRT_RECIPE_SRC="$GITHUB_WORKSPACE/benchmarks/multi_node/srt-slurm-recipes/vllm/deepseek-v4/agentic"
         SRT_RECIPE_DST="recipes/vllm/deepseek-v4/agentic"
     elif [[ $FRAMEWORK == "dynamo-sglang" ]]; then
