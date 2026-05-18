@@ -114,17 +114,33 @@ backend:
       enable-sleep-mode: true
       tokenizer-mode: deepseek_v4
 
-# Two-layer memory grant: sbatch_directives.mem=0 makes SLURM allocate
-# all available node memory to the job (~868 GB on CW gb300); without it,
-# the sbatch only requests ntasks × DefMemPerCPU = 8 × 4 GB = 32 GB total
-# for the whole job. srun_options.mem=0 then lets each container worker
-# srun step claim that node's full allocation. Both are needed: --mem=0
-# at sbatch sizes the cgroup, --mem=0 at srun fights SLURM's per-step
-# default of cpus_per_task × DefMemPerCPU = 4 GB. R7-R10 hit this with
-# OOM-killed workers; sacct showed AllocTRES mem=4G per step.
-# Docs: docs/config-reference.md#srun_options + #sbatch_directives.
+# sbatch + srun resource grants for clusters without per-GPU defaults.
+#
+# mem=0: allocate all available node memory (~868 GB on CW gb300). Without
+# this, sbatch only requests ntasks × DefMemPerCPU = 8 × 4 GB = 32 GB for
+# the whole job and worker cgroups OOM-kill mid model load (R7-R11 hit
+# this; sacct showed AllocTRES mem=4G per step).
+#
+# cpus-per-task=72: give each task one CW gb300 NUMA socket (144 cores
+# split 2 × 72). Critical for the *infra step* (etcd + nats) which
+# srtctl spawns without --gres=gpu — on CW that means DefMemPerCPU
+# applies and the step gets 1 CPU by default. With 24 dynamo DP ranks
+# all hammering etcd for lease keep-alives, single-CPU etcd can't keep
+# up and dies (R12 hit this; etcd reported max-cpu-set=1, leases
+# deadline-exceeded, infra SIGKILL'd at 16:35:49). 72 CPUs is plenty
+# for both etcd + nats AND for vLLM worker auxiliary threads.
+#
+# nv gb300 doesn't need this because cluster default DefCpuPerGPU=35
+# auto-allocates 4*35=140 CPUs per GPU-bearing task; cw has no per-GPU
+# default. Setting it here is safe on both because the value is ≤ node
+# CPU count.
+#
+# srun_options.mem=0 forces each srun step to use the full node memory
+# (without it, srun steps default back to cpus_per_task × DefMemPerCPU).
+# Docs: docs/config-reference.md#sbatch_directives + #srun_options.
 sbatch_directives:
   mem: "0"
+  cpus-per-task: "72"
 srun_options:
   mem: "0"
 
