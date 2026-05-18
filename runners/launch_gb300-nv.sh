@@ -62,7 +62,19 @@ RUN_KEY=$(printf "%s" "${RESULT_FILENAME:-${RUNNER_NAME:-gb300-nv}}" | sha1sum |
 SRT_REPO_DIR="${GITHUB_WORKSPACE}/srt-slurm-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-0}-${RUN_KEY}"
 rm -rf "$SRT_REPO_DIR"
 
-if [[ $FRAMEWORK == "dynamo-vllm" && $MODEL_PREFIX == "dsv4" ]]; then
+if [[ "$IS_AGENTIC" == "1" ]]; then
+    # Agentic multi-node uses the cquil11 fork because that's the only
+    # srt-slurm build that knows about benchmark.type=custom (the hook
+    # that hands control off to benchmarks/multi_node/agentic_srt.sh).
+    # Overlay our local agentic recipes so iteration stays in this repo;
+    # the fork's vllm/deepseek-v4/agentic/ directory is shadowed by ours.
+    git clone --branch cam/sa-submission-q2-2026 --single-branch \
+        https://github.com/cquil11/srt-slurm-nv.git "$SRT_REPO_DIR"
+    cd "$SRT_REPO_DIR"
+    mkdir -p recipes/vllm/deepseek-v4/agentic
+    cp -rT "$GITHUB_WORKSPACE/benchmarks/multi_node/srt-slurm-recipes/vllm/deepseek-v4/agentic" \
+        recipes/vllm/deepseek-v4/agentic
+elif [[ $FRAMEWORK == "dynamo-vllm" && $MODEL_PREFIX == "dsv4" ]]; then
     git clone https://github.com/NVIDIA/srt-slurm.git "$SRT_REPO_DIR"
     cd "$SRT_REPO_DIR"
     git checkout aflowers/gb200-dsv4-recipes
