@@ -923,19 +923,16 @@ resolve_trace_source() {
 }
 
 install_agentic_deps() {
+    # vllm/vllm-openai container ships without git. pip needs git to
+    # introspect the aiperf source tree on install. Install on demand;
+    # no-op when git is already present (e.g. AMD images that ship it).
+    if ! command -v git >/dev/null 2>&1; then
+        apt-get update && apt-get install -y git
+    fi
     agentic_pip_install --quiet urllib3 requests 2>/dev/null || true
     agentic_pip_install -q -r "$AGENTIC_DIR/requirements.txt"
-    # Non-editable install of aiperf from the submodule. We deliberately
-    # do NOT pass -e: pip's editable install records direct_url.json
-    # provenance by invoking `git version`, which fails on containers
-    # without git. The vllm/vllm-openai image doesn't ship git, and on
-    # gb300-nv the pyxis/enroot userns remap (uid 345200007 inside) breaks
-    # both `apt-get install git` (not root) and `sudo apt-get install git`
-    # (setuid bit doesn't honour cross-namespace ownership). Non-editable
-    # install builds a wheel and copies into site-packages — no git needed
-    # because aiperf's pyproject.toml pins version="0.8.0" via hatchling
-    # rather than deriving it from git tags. We don't edit aiperf inside
-    # a running benchmark anyway, so loss of -e ergonomics is zero.
+    # Editable install of aiperf from the submodule — gives us the
+    # `aiperf` CLI plus the inferencex-agentx-mvp scenario plugin.
     #
     # `--ignore-installed` sidesteps the distutils-uninstall error that
     # vLLM containers hit on apt-managed system packages (blinker, etc.)
@@ -943,7 +940,7 @@ install_agentic_deps() {
     # deps. Installing fresh into the user/site location is safe — the
     # system package stays in place and pip's import order picks up our
     # newer copy first.
-    agentic_pip_install -q --ignore-installed "$AIPERF_DIR"
+    agentic_pip_install -q --ignore-installed -e "$AIPERF_DIR"
     # Force-upgrade datasets: containers often ship an older version without
     # the `Json` feature type used by the HF traces dataset. `Json` was added
     # in datasets 4.7.0 (March 2025). Unpinned installs won't upgrade an
