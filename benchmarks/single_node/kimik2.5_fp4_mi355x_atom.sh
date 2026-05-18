@@ -13,11 +13,23 @@ check_env_vars \
     EP_SIZE \
     DP_ATTENTION
 
+if [[ "$CONC" -ge 1280 ]]; then
+  USE_TBO=1
+  DP_ATTENTION=true
+else
+  USE_TBO=0
+  DP_ATTENTION=false
+fi
+RESULT_FILENAME="${RESULT_FILENAME/dpafalse/dpa${DP_ATTENTION}}"
+RESULT_FILENAME="${RESULT_FILENAME/dpatrue/dpa${DP_ATTENTION}}"
+export USE_TBO DP_ATTENTION RESULT_FILENAME
+
 if [[ -n "$SLURM_JOB_ID" ]]; then
   echo "JOB $SLURM_JOB_ID running on $SLURMD_NODENAME"
 fi
 
-echo "TP: $TP, CONC: $CONC, ISL: $ISL, OSL: $OSL, EP_SIZE: $EP_SIZE, DP_ATTENTION: $DP_ATTENTION"
+echo "TP: $TP, CONC: $CONC, ISL: $ISL, OSL: $OSL, EP_SIZE: $EP_SIZE, DP_ATTENTION: $DP_ATTENTION, USE_TBO: $USE_TBO"
+echo "Result file: ${RESULT_FILENAME}.json"
 
 SERVER_LOG=/workspace/server.log
 PORT=${PORT:-8888}
@@ -37,8 +49,15 @@ else
   EP=" "
 fi
 
+SERVER_ARGS=()
+if [[ "$USE_TBO" == "1" ]]; then
+  SERVER_ARGS+=(--enable-tbo --enable-dp-attention)
+fi
+
 # Start GPU monitoring (power, temperature, clocks every second)
 start_gpu_monitor
+MEM_FRAC_STATIC=${MEM_FRAC_STATIC:-0.7}
+MAX_NUM_BATCHED_TOKENS=${MAX_NUM_BATCHED_TOKENS:-16384}
 
 set -x
 
@@ -47,7 +66,11 @@ python3 -m atom.entrypoints.openai_server \
     --server-port $PORT \
     -tp $TP \
     --kv_cache_dtype fp8 $CALCULATED_MAX_MODEL_LEN $EP \
+    --max-num-batched-tokens "$MAX_NUM_BATCHED_TOKENS" \
+    --gpu-memory-utilization "$MEM_FRAC_STATIC" \
+    --no-enable_prefix_caching \
     --trust-remote-code \
+    "${SERVER_ARGS[@]}" \
     > $SERVER_LOG 2>&1 &
 
 SERVER_PID=$!
