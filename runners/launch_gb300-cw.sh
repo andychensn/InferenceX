@@ -279,6 +279,23 @@ echo "Extracted JOB_ID: $JOB_ID"
 LOGS_DIR="outputs/$JOB_ID/logs"
 LOG_FILE="$LOGS_DIR/sweep_${JOB_ID}.log"
 
+# Snapshot worker logs on any exit path — normal completion, error,
+# SIGTERM (gh run cancel sends this to the launcher), even SIGKILL of
+# our parent. Without this trap, the cancel-time tar lives only in the
+# main flow below (after `wait $POLL_PID`), so a manual `gh run cancel`
+# during the tail wait skips it entirely and the
+# `Upload server logs` workflow step finds nothing to upload.
+# Idempotent: the main-flow tar at the bottom of this script is now a
+# no-op because the trap already produced the artifact, but it stays
+# for narrative continuity in normal (non-cancel) runs.
+_snapshot_server_logs() {
+    if [ -n "${LOGS_DIR:-}" ] && [ -d "$LOGS_DIR" ] && [ -n "${GITHUB_WORKSPACE:-}" ]; then
+        cp -r "$LOGS_DIR" "$GITHUB_WORKSPACE/LOGS" 2>/dev/null || true
+        tar czf "$GITHUB_WORKSPACE/multinode_server_logs.tar.gz" -C "$LOGS_DIR" . 2>/dev/null || true
+    fi
+}
+trap _snapshot_server_logs EXIT
+
 while ! ls "$LOG_FILE" &>/dev/null; do
     if ! squeue -j "$JOB_ID" --noheader 2>/dev/null | grep -q "$JOB_ID"; then
         echo "ERROR: Job $JOB_ID failed before creating log file"
@@ -309,8 +326,9 @@ echo "Collecting results..."
 
 if [ -d "$LOGS_DIR" ]; then
     echo "Found logs directory: $LOGS_DIR"
-    cp -r "$LOGS_DIR" "$GITHUB_WORKSPACE/LOGS"
-    tar czf "$GITHUB_WORKSPACE/multinode_server_logs.tar.gz" -C "$LOGS_DIR" .
+    # Tarball + LOGS copy are produced by the EXIT trap defined near
+    # JOB_ID extraction (so cancel paths also get them); just log here.
+    echo "multinode_server_logs.tar.gz will be (re)produced on script EXIT."
 else
     echo "Warning: Logs directory not found at $LOGS_DIR"
 fi
