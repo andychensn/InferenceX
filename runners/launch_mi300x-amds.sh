@@ -24,7 +24,9 @@ scancel_sync() {
     return 0
 }
 
-# Default exclude list for known-down mi300x nodes; override via SLURM_EXCLUDE_NODES env.
+# Pin to the known-good mi300x nodes; others are unavailable:
+#   chi-mi300x-033, chi-mi300x-037: down (Not responding)
+#   chi-mi300x-049:                  drained (persistent /nvme_home disk-full)
 export SLURM_EXCLUDE_NODES="${SLURM_EXCLUDE_NODES:-chi-mi300x-033.ord.vultr.cpe.ice.amd.com,chi-mi300x-035.ord.vultr.cpe.ice.amd.com,chi-mi300x-037.ord.vultr.cpe.ice.amd.com,chi-mi300x-049.ord.vultr.cpe.ice.amd.com}"
 
 if [[ "$IS_MULTINODE" == "true" ]]; then

@@ -24,7 +24,10 @@ scancel_sync() {
     return 0
 }
 
-# Override-able exclude list for known-down mi325x nodes via SLURM_EXCLUDE_NODES env.
+# Exclude known-broken mi325x nodes:
+#   chi-mi325x-pod1-121: enroot-aufs2ovlfs setcap fails on this node's NFS-backed
+#                        squash dir; container image import never completes
+#                        (root-caused via #1467/#1468/#1469 sweep failures).
 export SLURM_EXCLUDE_NODES="${SLURM_EXCLUDE_NODES:-}"
 
 if [[ "$IS_MULTINODE" == "true" ]]; then
