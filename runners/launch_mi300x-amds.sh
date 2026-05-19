@@ -9,7 +9,9 @@ LOCK_FILE="${SQUASH_FILE}.lock"
 
 set -x
 
-JOB_ID=$(salloc --partition=$PARTITION --gres=gpu:$TP --cpus-per-task=256 --time=180 --no-shell --job-name="$RUNNER_NAME" 2>&1 | tee /dev/stderr | grep -oP 'Granted job allocation \K[0-9]+')
+# Pin to the known-good mi300x nodes as of May 19; others are unavailable:
+#   Down: chi-mi300x-033, chi-mi300x-035, chi-mi300x-037, chi-mi300x-049
+JOB_ID=$(salloc --partition=$PARTITION --nodelist=chi-mi300x-[034,036,054,057,058].ord.vultr.cpe.ice.amd.com --gres=gpu:$TP --cpus-per-task=256 --time=180 --no-shell --job-name="$RUNNER_NAME" 2>&1 | tee /dev/stderr | grep -oP 'Granted job allocation \K[0-9]+')
 
 if [ -z "$JOB_ID" ]; then
     echo "ERROR: salloc failed to allocate a job"
