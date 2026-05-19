@@ -2934,3 +2934,14 @@
   description:
     - "Update SGLang ROCm image from v0.5.11/v0.5.10rc0 to v0.5.12-rocm720-mi35x-20260517"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1440
+
+- config-keys:
+    - qwen3.5-fp4-mi355x-sglang-disagg
+  description:
+    - "Add SGLang PD-disaggregation config for Qwen3.5-397B-A17B-MXFP4 on MI355X"
+    - "Image: lmsysorg/sglang-rocm:v0.5.10.post1-rocm720-mi35x-20260501"
+    - "Model: amd/Qwen3.5-397B-A17B-MXFP4"
+    - "1P1D TP8/EP1: 1k1k pure-TP, 8k1k with DP-attention; conc 8-512"
+    - "New launch script: benchmarks/multi_node/qwen3.5_fp4_mi355x_sglang-disagg.sh"
+    - "New models.yaml entry: Qwen3.5-397B-A17B-MXFP4 (aiter attn, mori transfer, fp8_e4m3 KV cache)"
+  pr-link: XXX
