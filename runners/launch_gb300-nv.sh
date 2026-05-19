@@ -366,6 +366,12 @@ if [[ "${RUN_EVAL:-false}" == "true" || "${EVAL_ONLY:-false}" == "true" ]]; then
     fi
 fi
 
+# Snapshot logs to GITHUB_WORKSPACE BEFORE cleanup, so the EXIT trap's
+# `[ -d "$LOGS_DIR" ]` guard isn't already false by the time it fires
+# (it runs AFTER the rm below, since EXIT traps are last-thing-before-exit).
+# Without this inline call, R25 lost both 1p6d shards' logs.
+_snapshot_server_logs
+
 # Clean up srt-slurm outputs to prevent NFS silly-rename lock files
 # from blocking the next job's checkout on this runner
 echo "Cleaning up srt-slurm outputs..."
