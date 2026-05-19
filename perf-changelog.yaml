@@ -2901,3 +2901,12 @@
   description:
     - "Add MI355X config: qwen3.5-fp4-sglang-mtp using lmsysorg/sglang-rocm:v0.5.12-rocm720-mi35x-20260517"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1445
+
+- config-keys:
+    - kimik2.5-fp4-mi355x-vllm-eagle3-fp8
+  description:
+    - "Add Kimi-K2.5 MXFP4 vLLM Eagle3 speculative decoding config with AMD Quark FP8 draft model on MI355X"
+    - "Image: vllm/vllm-openai-rocm:nightly-fb1ac806c55a6dc96fe92261b80c8550e9c39d2f"
+    - "Model: amd/Kimi-K2.5-MXFP4"
+    - "Draft model: amd/kimi-k2.5-eagle3-fp8 (num_speculative_tokens=6, draft_tp=1)"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1439
