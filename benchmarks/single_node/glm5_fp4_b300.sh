@@ -56,6 +56,7 @@ PYTHONNOUSERSITE=1 python3 -m sglang.launch_server --model-path=$MODEL --host=0.
 --stream-interval 30 \
 --scheduler-recv-interval 10 \
 --tokenizer-worker-num 6 \
+--enable-prefill-delayer --prefill-delayer-queue-min-ratio 0.1 --prefill-delayer-max-delay-ms 5000 \
 --tokenizer-path $MODEL $EVAL_CONTEXT_ARGS > $SERVER_LOG 2>&1 &
 
 SERVER_PID=$!

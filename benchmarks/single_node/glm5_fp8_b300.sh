@@ -61,6 +61,7 @@ PYTHONNOUSERSITE=1 python3 -m sglang.launch_server --model-path=$MODEL --host=0.
 --chunked-prefill-size 32768 --max-prefill-tokens 32768 \
 --enable-flashinfer-allreduce-fusion --disable-radix-cache \
 --stream-interval 30 \
+--enable-prefill-delayer --prefill-delayer-queue-min-ratio 0.1 --prefill-delayer-max-delay-ms 5000 \
 --model-loader-extra-config '{"enable_multithread_load": true}' $EVAL_CONTEXT_ARGS > $SERVER_LOG 2>&1 &
 
 SERVER_PID=$!
