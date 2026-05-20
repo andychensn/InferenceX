@@ -3060,4 +3060,4 @@
     - "Migrate H100 agg model path to /mnt/numa1/shared/models/ (audit-recommended root); set HF_HUB_CACHE to container's ~/.cache/huggingface for eval dataset downloads"
     - "Rewrite MODEL in launcher from HF id (org/name) to absolute local path under HF_HUB_CACHE_MOUNT; remove hf download from bench scripts so contract is staged-or-fail"
     - "Reduce search-space to single (isl=1024, osl=1024, conc=4) point per config to verify model-path wiring end-to-end"
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXXX
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1537
