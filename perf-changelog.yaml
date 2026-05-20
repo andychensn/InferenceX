@@ -3035,7 +3035,14 @@
     - "Bump ATOM image to rocm/atom:rocm7.2.3_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom20260511"
     - "TP=4 shows +3.2% to +16.3% throughput improvement across 1k1k and 8k1k workloads (concurrency 4-256)"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1411
-  
+
+- config-keys:
+    - dsv4-fp4-gb300-dynamo-sglang
+  description:
+    - "Update SGLang image from nightly-dev-cu13-20260519-dbac4647 to nightly-dev-cu13-20260520-425dffbd for all non-MTP disagg configs"
+    - "Remove SGLANG_OPT_FP8_WO_A_GEMM=0 workaround (topk_v2 crash fixed upstream in sgl-project/sglang#25805)"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1528
+
 
 - config-keys:
     - qwen3.5-fp4-b300-sglang
@@ -3045,8 +3052,15 @@
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1475
 
 - config-keys:
+    - glm5-fp8-b300-sglang
+    - glm5-fp8-b300-sglang-mtp
+  description:
+    - "Test @trevor-m's suggestion in sgl-project/sglang#25551: pin sgl-deep-gemm==0.0.1 inside v0.5.12 container to isolate whether the deep-gemm 0.0.1→0.1.0 upgrade is the source of the B300 CUDA_ERROR_ILLEGAL_ADDRESS regression."
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1512
+
+- config-keys:
     - dsv4-fp4-gb300-dynamo-vllm-mtp2
   description:
     - "Add initial DeepSeek-V4-Pro FP4 8k/1k GB300 Dynamo vLLM MTP recipes"
     - "1P/1D DEP4/TP4, 1P/1D DEP4/DEP8, 2P/1D DEP4/DEP8"
-  pr-link: TBD
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1535
