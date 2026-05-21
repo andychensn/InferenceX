@@ -239,8 +239,10 @@ jobs:
           name: agentic_${{ env.RESULT_FILENAME }}
           path: |
             results/server.log
+            results/lmcache_server.log
             results/benchmark.log
             results/config.yaml
+            results/lmcache_command.txt
             results/vllm_command.txt
             results/benchmark_command.txt
             results/workload_distribution_summary.txt
@@ -274,7 +276,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.eval-only && 'eval_server_logs_' || 'server_logs_' }}${{ env.RESULT_FILENAME }}
-          path: ${{ inputs.scenario-type == 'agentic-coding' && 'results/server.log' || 'server.log' }}
+          path: |
+            ${{ inputs.scenario-type == 'agentic-coding' && 'results/server.log' || 'server.log' }}
+            ${{ inputs.scenario-type == 'agentic-coding' && 'results/lmcache_server.log' || '' }}
           if-no-files-found: ignore
 
       - name: Upload GPU metrics

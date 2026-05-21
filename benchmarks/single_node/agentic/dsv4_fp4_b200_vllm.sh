@@ -75,13 +75,31 @@ cleanup_lmcache_server() {
 trap cleanup_lmcache_server EXIT
 
 wait_for_lmcache_ready() {
+    { set +x; } 2>/dev/null
     local attempts="${LMCACHE_READY_ATTEMPTS:-120}"
+    local tail_pid=""
+
+    while [ ! -f "$LMCACHE_LOG" ]; do
+        if [[ -n "$LMCACHE_PID" ]] && ! kill -0 "$LMCACHE_PID" 2>/dev/null; then
+            echo "LMCache server died before creating log file. Exiting." >&2
+            exit 1
+        fi
+        sleep 1
+    done
+
+    tail -f -n +1 "$LMCACHE_LOG" &
+    tail_pid=$!
+
     for ((i = 1; i <= attempts; i++)); do
         if curl --output /dev/null --silent --fail "http://127.0.0.1:${LMCACHE_HTTP_PORT}/healthcheck"; then
+            kill "$tail_pid" 2>/dev/null || true
+            wait "$tail_pid" 2>/dev/null || true
             return 0
         fi
         if [[ -n "$LMCACHE_PID" ]] && ! kill -0 "$LMCACHE_PID" 2>/dev/null; then
             echo "LMCache server died before becoming healthy. Log follows:" >&2
+            kill "$tail_pid" 2>/dev/null || true
+            wait "$tail_pid" 2>/dev/null || true
             cat "$LMCACHE_LOG" >&2 || true
             exit 1
         fi
@@ -89,6 +107,8 @@ wait_for_lmcache_ready() {
     done
 
     echo "Timed out waiting for LMCache server healthcheck. Log follows:" >&2
+    kill "$tail_pid" 2>/dev/null || true
+    wait "$tail_pid" 2>/dev/null || true
     cat "$LMCACHE_LOG" >&2 || true
     exit 1
 }
@@ -131,6 +151,7 @@ case "$OFFLOADING" in
         )
         ;;
     lmcache-mp)
+        { set +x; } 2>/dev/null
         # LMCache docs recommend MP mode for production: start an external
         # `lmcache server`, then point vLLM's LMCacheMPConnector at it. For
         # vLLM >= 0.20, prefer the LMCache-shipped connector module because it
@@ -154,16 +175,21 @@ case "$OFFLOADING" in
         LMCACHE_MAX_WORKERS="${LMCACHE_MAX_WORKERS:-$TP}"
 
         echo "Starting LMCache MP server..."
-        lmcache server \
-            --host "$LMCACHE_HOST" \
-            --port "$LMCACHE_PORT" \
-            --http-host "$LMCACHE_HOST" \
-            --http-port "$LMCACHE_HTTP_PORT" \
-            --l1-size-gb "$LMCACHE_L1_SIZE_GB" \
-            --l1-init-size-gb "$LMCACHE_L1_INIT_SIZE_GB" \
-            --chunk-size "$LMCACHE_CHUNK_SIZE" \
-            --max-workers "$LMCACHE_MAX_WORKERS" \
-            --eviction-policy LRU > "$LMCACHE_LOG" 2>&1 &
+        LMCACHE_CMD=(
+            lmcache server
+            --host "$LMCACHE_HOST"
+            --port "$LMCACHE_PORT"
+            --http-host "$LMCACHE_HOST"
+            --http-port "$LMCACHE_HTTP_PORT"
+            --l1-size-gb "$LMCACHE_L1_SIZE_GB"
+            --l1-init-size-gb "$LMCACHE_L1_INIT_SIZE_GB"
+            --chunk-size "$LMCACHE_CHUNK_SIZE"
+            --max-workers "$LMCACHE_MAX_WORKERS"
+            --eviction-policy LRU
+        )
+        printf '%q ' "${LMCACHE_CMD[@]}" > "$RESULT_DIR/lmcache_command.txt"
+        printf '\n' >> "$RESULT_DIR/lmcache_command.txt"
+        "${LMCACHE_CMD[@]}" > "$LMCACHE_LOG" 2>&1 &
         LMCACHE_PID=$!
         echo "LMCache server PID: $LMCACHE_PID"
         wait_for_lmcache_ready
@@ -206,25 +232,31 @@ export TORCH_CUDA_ARCH_LIST="10.0"
 export PYTHONNOUSERSITE=1
 export VLLM_FLOAT32_MATMUL_PRECISION=high
 
-vllm serve "$MODEL" \
---host 0.0.0.0 \
---port "$PORT" \
---trust-remote-code \
---kv-cache-dtype fp8 \
---block-size 256 \
-"${PARALLEL_ARGS[@]}" \
-"${EP_ARGS[@]}" \
---compilation-config '{"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"]}' \
---attention_config.use_fp4_indexer_cache=True \
---tokenizer-mode deepseek_v4 \
---tool-call-parser deepseek_v4 \
---enable-auto-tool-choice \
---reasoning-parser deepseek_v4 \
---enable-prefix-caching \
-"${HYBRID_KV_ARGS[@]}" \
---max-model-len "$MAX_MODEL_LEN" \
---max-num-seqs "$PER_ENGINE_MAX_NUM_SEQS" \
-"${OFFLOAD_ARGS[@]}" > "$SERVER_LOG" 2>&1 &
+{ set +x; } 2>/dev/null
+VLLM_CMD=(
+    vllm serve "$MODEL"
+    --host 0.0.0.0
+    --port "$PORT"
+    --trust-remote-code
+    --kv-cache-dtype fp8
+    --block-size 256
+    "${PARALLEL_ARGS[@]}"
+    "${EP_ARGS[@]}"
+    --compilation-config '{"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"]}'
+    --attention_config.use_fp4_indexer_cache=True
+    --tokenizer-mode deepseek_v4
+    --tool-call-parser deepseek_v4
+    --enable-auto-tool-choice
+    --reasoning-parser deepseek_v4
+    --enable-prefix-caching
+    "${HYBRID_KV_ARGS[@]}"
+    --max-model-len "$MAX_MODEL_LEN"
+    --max-num-seqs "$PER_ENGINE_MAX_NUM_SEQS"
+    "${OFFLOAD_ARGS[@]}"
+)
+printf '%q ' "${VLLM_CMD[@]}" | tee "$RESULT_DIR/vllm_command.txt"
+printf '\n' | tee -a "$RESULT_DIR/vllm_command.txt"
+"${VLLM_CMD[@]}" > "$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
 
