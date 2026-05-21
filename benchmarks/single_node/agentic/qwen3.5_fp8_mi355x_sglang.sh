@@ -50,27 +50,27 @@ case "$OFFLOADING" in
         ;;
     hicache)
         # HiCache extends RadixAttention, so do not pass --disable-radix-cache.
-        # MI355X nodes have about 3 TB of host DRAM, but HiCache allocates a
-        # large host pool in every TP rank after the model/runtime have already
-        # consumed memory. A 2 TB node-total target becomes 250 GB/rank at TP=8
-        # and has failed with only ~120-190 GB free by the time later ranks
-        # attach the host pool. Keep the node-total knob for one-off tuning, but
-        # cap the default per-rank pool below the failed 250 GB/rank request.
+        # MI355X nodes have about 3 TB of host DRAM, but Qwen3.5's hybrid
+        # GDN/Mamba path allocates two HiCache host pools per TP rank: one for
+        # hierarchical KV cache and one for hierarchical Mamba cache. A 2 TB
+        # node-total target at TP=8 is therefore 2000 / (8 * 2) = 125 GB per
+        # host pool, not 250 GB. Keep overrides for one-off tuning.
         TOTAL_CPU_DRAM_GB="${HICACHE_TOTAL_CPU_DRAM_GB:-2000}"
-        HICACHE_MAX_SIZE_GB_PER_RANK="${HICACHE_MAX_SIZE_GB_PER_RANK:-180}"
+        HICACHE_HOST_POOL_COUNT="${HICACHE_HOST_POOL_COUNT:-2}"
+        HICACHE_MAX_SIZE_GB_PER_RANK_POOL="${HICACHE_MAX_SIZE_GB_PER_RANK_POOL:-${HICACHE_MAX_SIZE_GB_PER_RANK:-180}}"
         HICACHE_WRITE_POLICY="${HICACHE_WRITE_POLICY:-write_through_selective}"
-        # SGLang --hicache-size is per rank, while the workflow input is a
-        # node-total DRAM budget. Divide by TP unless HICACHE_SIZE_GB is set
-        # directly for one-off tuning.
-        HICACHE_SIZE_GB="${HICACHE_SIZE_GB:-$((TOTAL_CPU_DRAM_GB / TP))}"
-        if [ "$HICACHE_SIZE_GB" -gt "$HICACHE_MAX_SIZE_GB_PER_RANK" ]; then
-            HICACHE_SIZE_GB="$HICACHE_MAX_SIZE_GB_PER_RANK"
+        # SGLang --hicache-size is per rank per host pool, while the workflow
+        # input is a node-total DRAM budget. Divide by TP and the number of
+        # host pools unless HICACHE_SIZE_GB is set directly for one-off tuning.
+        HICACHE_SIZE_GB="${HICACHE_SIZE_GB:-$((TOTAL_CPU_DRAM_GB / TP / HICACHE_HOST_POOL_COUNT))}"
+        if [ "$HICACHE_SIZE_GB" -gt "$HICACHE_MAX_SIZE_GB_PER_RANK_POOL" ]; then
+            HICACHE_SIZE_GB="$HICACHE_MAX_SIZE_GB_PER_RANK_POOL"
         fi
         if [ "$HICACHE_SIZE_GB" -lt 1 ]; then
-            echo "Error: computed HICACHE_SIZE_GB=$HICACHE_SIZE_GB from TOTAL_CPU_DRAM_GB=$TOTAL_CPU_DRAM_GB and TP=$TP" >&2
+            echo "Error: computed HICACHE_SIZE_GB=$HICACHE_SIZE_GB from TOTAL_CPU_DRAM_GB=$TOTAL_CPU_DRAM_GB, TP=$TP, HICACHE_HOST_POOL_COUNT=$HICACHE_HOST_POOL_COUNT" >&2
             exit 1
         fi
-        echo "HiCache CPU pool: ${HICACHE_SIZE_GB} GB per rank across TP=${TP}"
+        echo "HiCache CPU pool: ${HICACHE_SIZE_GB} GB per rank per host pool across TP=${TP}, host_pool_count=${HICACHE_HOST_POOL_COUNT}"
         CACHE_ARGS=(
             --page-size 64
             --enable-hierarchical-cache
