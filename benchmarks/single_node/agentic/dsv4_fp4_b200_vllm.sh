@@ -23,9 +23,8 @@ set -x
 # OFFLOADING values:
 #   none        - vLLM GPU KV only, with DSv4 hybrid KV manager enabled.
 #   cpu         - vLLM SimpleCPUOffloadConnector, with hybrid KV manager enabled.
-#   lmcache-mp  - LMCache multiprocess server + LMCacheMPConnector. Current
-#                 LMCache MP connector rejects hybrid block-id tuples, so this
-#                 mode intentionally disables vLLM's hybrid KV manager.
+#   lmcache-mp  - Temporarily disabled for DSv4. LMCache PR #3261 must merge
+#                 first so LMCacheMPConnector can support HMA block-id tuples.
 
 source "$(dirname "$0")/../../benchmark_lib.sh"
 
@@ -152,6 +151,12 @@ case "$OFFLOADING" in
         ;;
     lmcache-mp)
         { set +x; } 2>/dev/null
+        # LMCacheMPConnector needs HMA support before it can run DSv4 with the
+        # hybrid KV manager. Re-enable this path after
+        # https://github.com/LMCache/LMCache/pull/3261 is merged.
+        echo "Error: OFFLOADING=lmcache-mp is disabled for DSv4 until LMCache PR #3261 adds HMA support." >&2
+        exit 1
+
         # LMCache docs recommend MP mode for production: start an external
         # `lmcache server`, then point vLLM's LMCacheMPConnector at it. For
         # vLLM >= 0.20, prefer the LMCache-shipped connector module because it
@@ -170,7 +175,7 @@ case "$OFFLOADING" in
         LMCACHE_PORT="${LMCACHE_PORT:-5555}"
         LMCACHE_HTTP_PORT="${LMCACHE_HTTP_PORT:-8080}"
         LMCACHE_L1_SIZE_GB="${LMCACHE_L1_SIZE_GB:-$TOTAL_CPU_DRAM_GB}"
-        LMCACHE_L1_INIT_SIZE_GB="${LMCACHE_L1_INIT_SIZE_GB:-20}"
+        LMCACHE_L1_INIT_SIZE_GB="${LMCACHE_L1_INIT_SIZE_GB:-200}"
         LMCACHE_CHUNK_SIZE="${LMCACHE_CHUNK_SIZE:-256}"
         LMCACHE_MAX_WORKERS="${LMCACHE_MAX_WORKERS:-$TP}"
 
