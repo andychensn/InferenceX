@@ -62,8 +62,12 @@ else
     SERVE_MAX_MODEL_LEN="$BENCHMARK_MAX_MODEL_LEN"
 fi
 
-# use 2 speculative tokens for all configs for now
+# Keep the existing Pro MTP profile at 2 speculative tokens; Flash uses the
+# requested 3-token MTP profile.
 NUM_SPEC_TOKENS=2
+if [[ "$MODEL" == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
+    NUM_SPEC_TOKENS=3
+fi
 
 start_gpu_monitor
 
