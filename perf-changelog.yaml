@@ -2966,6 +2966,12 @@
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1033
 
 - config-keys:
+    - dsr1-fp8-mi355x-sglang-mtp
+  description:
+    - "Add MTP/EAGLE speculative-decoding sibling for dsr1-fp8-mi355x-sglang (model: deepseek-ai/DeepSeek-R1-0528) on lmsysorg/sglang:v0.5.12-rocm700-mi35x"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1521
+
+- config-keys:
     - dsr1-fp4-mi355x-atom
     - dsr1-fp4-mi355x-atom-mtp
   description:
@@ -3052,11 +3058,16 @@
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1475
 
 - config-keys:
-    - glm5-fp8-b300-sglang
-    - glm5-fp8-b300-sglang-mtp
+    - dsv4-fp4-mi355x-vllm
   description:
-    - "Test @trevor-m's suggestion in sgl-project/sglang#25551: pin sgl-deep-gemm==0.0.1 inside v0.5.12 container to isolate whether the deep-gemm 0.0.1→0.1.0 upgrade is the source of the B300 CUDA_ERROR_ILLEGAL_ADDRESS regression."
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1512
+    - "Bump vLLM ROCm image from nightly-b50646e5effd7cb5884cd96fdff4c53c18521198 to nightly-4f940896a32c9e2a0eba7f50d521bf5f6b4de458"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1546
+
+- config-keys:
+    - dsv4-fp4-mi355x-sglang
+  description:
+    - "Bump image to rocm/sgl-dev:rocm720-mi35x-8c3b5aa-20260521-DSv4"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1548
 
 - config-keys:
     - dsv4-fp4-gb300-dynamo-vllm-mtp2
