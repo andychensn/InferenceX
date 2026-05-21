@@ -117,11 +117,6 @@ else
     MAX_RUNNING_REQUESTS="$(( CONC * 3 / 2 > 8 ? CONC * 3 / 2 : 8 ))"
 fi
 
-PROFILE_ARGS=()
-if [[ "${PROFILE:-}" == "1" && "$MODEL" == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
-    PROFILE_ARGS+=(--num-continuous-decode-steps 2)
-fi
-
 # Print all SGLANG_* env vars to both the CI step log and server.log so the
 # launch config is auditable from the result artifact alone.
 {
@@ -143,8 +138,7 @@ PYTHONNOUSERSITE=1 sglang serve \
     --mem-fraction-static "$MEM_FRACTION_STATIC" \
     --swa-full-tokens-ratio 0.1 \
     "${SPEC_FLAGS[@]}" \
-    "${PARALLEL_ARGS[@]}" \
-    "${PROFILE_ARGS[@]}" $EVAL_CONTEXT_ARGS >> $SERVER_LOG 2>&1 &
+    "${PARALLEL_ARGS[@]}" $EVAL_CONTEXT_ARGS >> $SERVER_LOG 2>&1 &
 
 SERVER_PID=$!
 
