@@ -73,7 +73,7 @@ on:
         type: string
         default: 'fixed-seq-len'
       offloading:
-        description: "KV offload backend for agentic scenarios (none/cpu/ssd)"
+        description: "KV offload backend for agentic scenarios (none/cpu/ssd/lmcache-mp)"
         required: false
         type: string
         default: 'none'

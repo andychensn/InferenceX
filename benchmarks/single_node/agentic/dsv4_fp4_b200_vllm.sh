@@ -19,6 +19,13 @@ set -x
 #
 # Required env vars:
 #   MODEL, TP, CONC, OFFLOADING, TOTAL_CPU_DRAM_GB, RESULT_DIR
+#
+# OFFLOADING values:
+#   none        - vLLM GPU KV only, with DSv4 hybrid KV manager enabled.
+#   cpu         - vLLM SimpleCPUOffloadConnector, with hybrid KV manager enabled.
+#   lmcache-mp  - LMCache multiprocess server + LMCacheMPConnector. Current
+#                 LMCache MP connector rejects hybrid block-id tuples, so this
+#                 mode intentionally disables vLLM's hybrid KV manager.
 
 source "$(dirname "$0")/../../benchmark_lib.sh"
 
@@ -51,9 +58,41 @@ export VLLM_ENGINE_READY_TIMEOUT_S=3600
 
 # ---- Server config ----------------------------------------------------------
 SERVER_LOG="$RESULT_DIR/server.log"
+LMCACHE_LOG="$RESULT_DIR/lmcache_server.log"
 mkdir -p "$RESULT_DIR"
 
-OFFLOAD_ARGS=""
+OFFLOAD_ARGS=()
+HYBRID_KV_ARGS=(--no-disable-hybrid-kv-cache-manager)
+LMCACHE_PID=""
+
+cleanup_lmcache_server() {
+    if [[ -n "$LMCACHE_PID" ]] && kill -0 "$LMCACHE_PID" 2>/dev/null; then
+        kill "$LMCACHE_PID" 2>/dev/null || true
+        wait "$LMCACHE_PID" 2>/dev/null || true
+    fi
+}
+
+trap cleanup_lmcache_server EXIT
+
+wait_for_lmcache_ready() {
+    local attempts="${LMCACHE_READY_ATTEMPTS:-120}"
+    for ((i = 1; i <= attempts; i++)); do
+        if curl --output /dev/null --silent --fail "http://127.0.0.1:${LMCACHE_HTTP_PORT}/healthcheck"; then
+            return 0
+        fi
+        if [[ -n "$LMCACHE_PID" ]] && ! kill -0 "$LMCACHE_PID" 2>/dev/null; then
+            echo "LMCache server died before becoming healthy. Log follows:" >&2
+            cat "$LMCACHE_LOG" >&2 || true
+            exit 1
+        fi
+        sleep 1
+    done
+
+    echo "Timed out waiting for LMCache server healthcheck. Log follows:" >&2
+    cat "$LMCACHE_LOG" >&2 || true
+    exit 1
+}
+
 case "$OFFLOADING" in
     none) ;;
     cpu)
@@ -86,10 +125,57 @@ case "$OFFLOADING" in
         # mode defers the store path and clears low/mid CONC at 80-100%.
         # See SimpleCPUOffloadConnector PR #37160 for the lazy_offload knob.
         export VLLM_USE_SIMPLE_KV_OFFLOAD=1
-        OFFLOAD_ARGS="--kv-transfer-config {\"kv_connector\":\"SimpleCPUOffloadConnector\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{\"cpu_bytes_to_use\":$PER_ENGINE_BYTES,\"lazy_offload\":true}}"
+        OFFLOAD_ARGS=(
+            --kv-transfer-config
+            "{\"kv_connector\":\"SimpleCPUOffloadConnector\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{\"cpu_bytes_to_use\":$PER_ENGINE_BYTES,\"lazy_offload\":true}}"
+        )
+        ;;
+    lmcache-mp)
+        # LMCache docs recommend MP mode for production: start an external
+        # `lmcache server`, then point vLLM's LMCacheMPConnector at it. For
+        # vLLM >= 0.20, prefer the LMCache-shipped connector module because it
+        # tracks the latest server protocol ahead of vLLM's vendored copy.
+        #
+        # Important DSv4 caveat: LMCacheMPConnector currently only accepts the
+        # non-hybrid KV block layout. The connector raises if vLLM returns the
+        # hybrid block-id tuple used by the CSA/HCA hybrid KV manager. This
+        # mode therefore disables the hybrid manager; `none` and `cpu` keep it
+        # enabled for the normal B200 DSv4 path.
+        agentic_pip_install --quiet --no-cache-dir lmcache
+        python3 -c "import lmcache.integration.vllm.lmcache_mp_connector" >/dev/null
+
+        TOTAL_CPU_DRAM_GB=2800
+        LMCACHE_HOST="${LMCACHE_HOST:-127.0.0.1}"
+        LMCACHE_PORT="${LMCACHE_PORT:-5555}"
+        LMCACHE_HTTP_PORT="${LMCACHE_HTTP_PORT:-8080}"
+        LMCACHE_L1_SIZE_GB="${LMCACHE_L1_SIZE_GB:-$TOTAL_CPU_DRAM_GB}"
+        LMCACHE_L1_INIT_SIZE_GB="${LMCACHE_L1_INIT_SIZE_GB:-20}"
+        LMCACHE_CHUNK_SIZE="${LMCACHE_CHUNK_SIZE:-256}"
+        LMCACHE_MAX_WORKERS="${LMCACHE_MAX_WORKERS:-$TP}"
+
+        echo "Starting LMCache MP server..."
+        lmcache server \
+            --host "$LMCACHE_HOST" \
+            --port "$LMCACHE_PORT" \
+            --http-host "$LMCACHE_HOST" \
+            --http-port "$LMCACHE_HTTP_PORT" \
+            --l1-size-gb "$LMCACHE_L1_SIZE_GB" \
+            --l1-init-size-gb "$LMCACHE_L1_INIT_SIZE_GB" \
+            --chunk-size "$LMCACHE_CHUNK_SIZE" \
+            --max-workers "$LMCACHE_MAX_WORKERS" \
+            --eviction-policy LRU > "$LMCACHE_LOG" 2>&1 &
+        LMCACHE_PID=$!
+        echo "LMCache server PID: $LMCACHE_PID"
+        wait_for_lmcache_ready
+
+        HYBRID_KV_ARGS=(--disable-hybrid-kv-cache-manager)
+        OFFLOAD_ARGS=(
+            --kv-transfer-config
+            "{\"kv_connector\":\"LMCacheMPConnector\",\"kv_connector_module_path\":\"lmcache.integration.vllm.lmcache_mp_connector\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{\"lmcache.mp.host\":\"$LMCACHE_HOST\",\"lmcache.mp.port\":$LMCACHE_PORT}}"
+        )
         ;;
     *)
-        echo "Error: unsupported OFFLOADING value '$OFFLOADING' (expected one of: none, cpu)" >&2
+        echo "Error: unsupported OFFLOADING value '$OFFLOADING' (expected one of: none, cpu, lmcache-mp)" >&2
         exit 1
         ;;
 esac
@@ -135,10 +221,10 @@ vllm serve "$MODEL" \
 --enable-auto-tool-choice \
 --reasoning-parser deepseek_v4 \
 --enable-prefix-caching \
---no-disable-hybrid-kv-cache-manager \
+"${HYBRID_KV_ARGS[@]}" \
 --max-model-len "$MAX_MODEL_LEN" \
 --max-num-seqs "$PER_ENGINE_MAX_NUM_SEQS" \
-$OFFLOAD_ARGS > "$SERVER_LOG" 2>&1 &
+"${OFFLOAD_ARGS[@]}" > "$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
 
