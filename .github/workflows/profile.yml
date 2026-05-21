@@ -171,7 +171,7 @@ jobs:
             exit 1
           fi
 
-          trace_path="/workspace/profile_${res_name}.trace.json.gz"
+          trace_path="profile_${res_name}.trace.json.gz"
           if [ -f "$trace_path" ]; then
             echo "trace=$trace_path" >> "$GITHUB_OUTPUT"
             if [ "${FRAMEWORK}" = "sglang" ]; then
