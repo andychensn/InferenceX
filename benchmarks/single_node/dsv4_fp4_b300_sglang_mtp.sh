@@ -80,7 +80,7 @@ if [ "${DP_ATTENTION}" = "true" ]; then
     SPECULATIVE_NUM_STEPS=1
     SPECULATIVE_NUM_DRAFT_TOKENS=2
     if [[ "$MODEL" == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
-        SPECULATIVE_NUM_STEPS=2
+        SPECULATIVE_NUM_STEPS=3
         SPECULATIVE_NUM_DRAFT_TOKENS=3
     fi
     SPEC_FLAGS=(
@@ -117,6 +117,11 @@ else
     MAX_RUNNING_REQUESTS="$(( CONC * 3 / 2 > 8 ? CONC * 3 / 2 : 8 ))"
 fi
 
+PROFILE_ARGS=()
+if [[ "${PROFILE:-}" == "1" && "$MODEL" == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
+    PROFILE_ARGS+=(--num-continuous-decode-steps 2)
+fi
+
 # Print all SGLANG_* env vars to both the CI step log and server.log so the
 # launch config is auditable from the result artifact alone.
 {
@@ -138,7 +143,8 @@ PYTHONNOUSERSITE=1 sglang serve \
     --mem-fraction-static "$MEM_FRACTION_STATIC" \
     --swa-full-tokens-ratio 0.1 \
     "${SPEC_FLAGS[@]}" \
-    "${PARALLEL_ARGS[@]}" $EVAL_CONTEXT_ARGS >> $SERVER_LOG 2>&1 &
+    "${PARALLEL_ARGS[@]}" \
+    "${PROFILE_ARGS[@]}" $EVAL_CONTEXT_ARGS >> $SERVER_LOG 2>&1 &
 
 SERVER_PID=$!
 
