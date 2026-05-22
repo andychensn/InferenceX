@@ -141,18 +141,24 @@ case "$OFFLOADING" in
         unset VLLM_USE_SIMPLE_KV_OFFLOAD
 
         agentic_pip_install --quiet --no-cache-dir lmcache
-        # LMCache's current dependency chain can install NVIDIA/CUDA NIXL
-        # packages on ROCm. vLLM 0.21.0 treats ROCm as "cuda-like", and during
-        # Kimi fused-MoE model inspection it imports nixl_ep whenever that
-        # module is importable, even when this run is not using EP/NIXL kernels.
-        # The CUDA extension then fails immediately on AMD nodes with
-        # "ImportError: libcuda.so.1". Remove the CUDA NIXL packages before
-        # vLLM starts, but keep LMCache's remaining dependencies intact: the MP
-        # server imports cupy during startup even when it falls back to the
-        # non-CUDA backend on ROCm.
+        # LMCache's current dependency chain can install NVIDIA/CUDA NIXL and
+        # CuPy packages on ROCm. vLLM 0.21.0 treats ROCm as "cuda-like", and
+        # during Kimi fused-MoE model inspection it imports nixl_ep whenever
+        # that module is importable, even when this run is not using EP/NIXL
+        # kernels. The CUDA extension then fails immediately on AMD nodes with
+        # "ImportError: libcuda.so.1".
+        #
+        # LMCache MP also uses CuPy stream APIs while registering vLLM's KV
+        # caches. The CUDA CuPy wheel imports on ROCm, but it fails at runtime
+        # with cudaErrorInsufficientDriver when LMCache touches the stream. Use
+        # the ROCm 7 CuPy wheel so the same API dispatches through HIP.
         python3 -m pip uninstall -y \
             nixl nixl-cu12 nixl-cu13 nixl_ep \
             >/dev/null 2>&1 || true
+        python3 -m pip uninstall -y \
+            cupy cupy-cuda11x cupy-cuda12x cupy-cuda13x \
+            >/dev/null 2>&1 || true
+        agentic_pip_install --quiet --no-cache-dir cupy-rocm-7-0
         python3 - <<'PY'
 import importlib.util
 import sys
@@ -164,6 +170,20 @@ if spec is not None:
         "Error: nixl_ep is still importable after LMCache install; "
         "this ROCm Kimi run would import a CUDA-only nixl_ep module. "
         f"location={locations}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+try:
+    from cupy_backends.cuda.api import runtime as cupy_runtime
+except Exception as exc:
+    print(f"Error: failed to import CuPy runtime after ROCm CuPy install: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+if not getattr(cupy_runtime, "is_hip", False):
+    print(
+        "Error: CuPy is still using the CUDA backend after installing "
+        "cupy-rocm-7-0; LMCache MP would fail during KV-cache registration.",
         file=sys.stderr,
     )
     sys.exit(1)
