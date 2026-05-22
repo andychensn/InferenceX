@@ -61,7 +61,10 @@ COMPILATION_ARGS=(
     --max-cudagraph-capture-size 2048
 )
 if [[ "$MODEL" == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
-    COMPILATION_ARGS=(--compilation-config '{"mode":0,"cudagraph_mode":"NONE","custom_ops":["all"]}')
+    COMPILATION_ARGS=(
+        --compilation-config '{"mode":0,"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"]}'
+        --max-cudagraph-capture-size 2048
+    )
 fi
 
 BENCHMARK_MAX_MODEL_LEN=$MAX_MODEL_LEN
