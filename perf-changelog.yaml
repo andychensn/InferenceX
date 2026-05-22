@@ -3089,3 +3089,11 @@
   description:
     - "Update SGLang image from v0.5.10.post1-cu130 / v0.5.11-cu130 (30d old) to v0.5.12-cu130"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1451
+
+- config-keys:
+    - qwen3.5-fp4-mi355x-sglang-mtp
+    - qwen3.5-fp8-mi355x-atom-mtp
+  description:
+    - "Pass --use-chat-template in Qwen3.5 MI355X MTP benchmark clients"
+    - "Apply eval-only max-model-len sizing for Qwen3.5 FP8 MI355X ATOM MTP"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1556
