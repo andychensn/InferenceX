@@ -163,10 +163,38 @@ if os.environ.get("LMCACHE_ROCM_DEMAND_PINNED_ALLOCATOR") == "1":
         _LazyMemoryAllocator.batched_allocate = _patched_batched_allocate
         _LazyMemoryAllocator._agentic_rocm_demand_patch = True
 
+    def _patch_l1_memory_manager(_memory_manager) -> None:
+        _L1MemoryManager = getattr(_memory_manager, "L1MemoryManager", None)
+        _LazyMemoryAllocator = getattr(_memory_manager, "LazyMemoryAllocator", None)
+        if _L1MemoryManager is None or _LazyMemoryAllocator is None:
+            return
+        if getattr(_L1MemoryManager, "_agentic_rocm_final_capacity_patch", False):
+            return
+
+        _orig_get_memory_usage = _L1MemoryManager.get_memory_usage
+
+        def _patched_get_memory_usage(self):
+            allocator = getattr(self, "_allocator", None)
+            if isinstance(allocator, _LazyMemoryAllocator):
+                address_manager = allocator.get_address_manager()
+                used_size = (
+                    address_manager.get_heap_size() - address_manager.get_free_size()
+                )
+                return used_size, allocator._final_size
+            return _orig_get_memory_usage(self)
+
+        _L1MemoryManager.get_memory_usage = _patched_get_memory_usage
+        _L1MemoryManager._agentic_rocm_final_capacity_patch = True
+
     def _maybe_patch_lazy_memory_allocator() -> None:
         module = sys.modules.get("lmcache.v1.lazy_memory_allocator")
         if module is not None and hasattr(module, "LazyMemoryAllocator"):
             _patch_lazy_memory_allocator(module)
+
+    def _maybe_patch_l1_memory_manager() -> None:
+        module = sys.modules.get("lmcache.v1.distributed.memory_manager")
+        if module is not None and hasattr(module, "L1MemoryManager"):
+            _patch_l1_memory_manager(module)
 
     def _agentic_rocm_import(name, globals=None, locals=None, fromlist=(), level=0):
         module = _orig_import(name, globals, locals, fromlist, level)
@@ -174,10 +202,16 @@ if os.environ.get("LMCACHE_ROCM_DEMAND_PINNED_ALLOCATOR") == "1":
             name.startswith("lmcache") and "lmcache.v1.lazy_memory_allocator" in sys.modules
         ):
             _maybe_patch_lazy_memory_allocator()
+        if name == "lmcache.v1.distributed.memory_manager" or (
+            name.startswith("lmcache")
+            and "lmcache.v1.distributed.memory_manager" in sys.modules
+        ):
+            _maybe_patch_l1_memory_manager()
         return module
 
     builtins.__import__ = _agentic_rocm_import
     _maybe_patch_lazy_memory_allocator()
+    _maybe_patch_l1_memory_manager()
 
 if os.environ.get("LMCACHE_ROCM_MP_BLOCK_FALLBACK") == "1":
     import torch
