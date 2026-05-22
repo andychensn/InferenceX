@@ -985,16 +985,11 @@ build_replay_cmd() {
     REPLAY_CMD+=" --concurrency $CONC"
     REPLAY_CMD+=" --benchmark-duration $duration"
     REPLAY_CMD+=" --random-seed 42"
-    # Disabled (1.0 = 100% allowed). On gb300-nv 1p6d agentic at conc=192,
-    # prefill-queue saturation drives 25-50% NATS RPC deadline timeouts
-    # (10s hardcoded in async-nats; no DYN_NATS_REQUEST_TIMEOUT exists).
-    # Threshold of 0.20 was tripping mid-run; raising to 1.0 lets the
-    # benchmark complete and produce real headline numbers (prefill tput,
-    # ITL, TTFT distribution) for the requests that do land. Underlying
-    # capacity issue (single prefill worker for 192-way concurrency) is
-    # being tracked separately — switch request plane to TCP or scale to
-    # 3p4d to mitigate. Revisit this threshold once that is fixed.
-    REPLAY_CMD+=" --failed-request-threshold 1.0"
+    # Fail runs once more than 10% of requests error. This keeps known
+    # transient low-rate failures from killing long sweeps while still
+    # catching malformed payloads or server crashes before they get aggregated
+    # as benchmarkable data.
+    REPLAY_CMD+=" --failed-request-threshold 0.10"
     # Sample each trajectory's warmup start position uniformly from
     # [25%, 75%] of the trace's turn count (was hardcoded 0%-70% upstream).
     # Avoids starting trajectories right at turn 0 where the KV cache is
