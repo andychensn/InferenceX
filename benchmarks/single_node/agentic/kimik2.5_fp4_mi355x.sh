@@ -141,6 +141,27 @@ case "$OFFLOADING" in
         unset VLLM_USE_SIMPLE_KV_OFFLOAD
 
         agentic_pip_install --quiet --no-cache-dir lmcache
+        # LMCache's current dependency chain can install the NVIDIA/CUDA NIXL
+        # package on ROCm. vLLM 0.21.0 treats ROCm as "cuda-like", and during
+        # Kimi fused-MoE model inspection it imports nixl_ep whenever the module
+        # is importable, even when this run is not using EP/NIXL kernels. The
+        # CUDA wheel then fails immediately on AMD nodes with
+        # "ImportError: libcuda.so.1". LMCache MP only needs the ZMQ server and
+        # connector here, so keep LMCache installed but remove the CUDA NIXL
+        # module before vLLM starts.
+        python3 -m pip uninstall -y nixl nixl_ep >/dev/null 2>&1 || true
+        python3 - <<'PY'
+import importlib.util
+import sys
+
+if importlib.util.find_spec("nixl_ep") is not None:
+    print(
+        "Error: nixl_ep is still importable after LMCache install; "
+        "this ROCm Kimi run would import a CUDA-only nixl_ep module.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PY
         python3 -c "import lmcache.integration.vllm.lmcache_mp_connector" >/dev/null
 
         # Match the B200 Kimi LMCache setup: keep a 2.5 TB semantic CPU KV
