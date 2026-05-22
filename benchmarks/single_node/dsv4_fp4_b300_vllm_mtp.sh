@@ -68,6 +68,15 @@ if [[ "$MODEL" == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
 fi
 
 BENCHMARK_MAX_MODEL_LEN=$MAX_MODEL_LEN
+BENCHMARK_OUTPUT_LEN=$OSL
+BENCHMARK_NUM_PROMPTS=$((CONC * 10))
+BENCHMARK_MAX_CONCURRENCY=$CONC
+
+if [[ "${PROFILE:-}" == "1" && "$MODEL" == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
+    BENCHMARK_OUTPUT_LEN=5
+    BENCHMARK_NUM_PROMPTS=1
+    BENCHMARK_MAX_CONCURRENCY=1
+fi
 
 if [ "${EVAL_ONLY}" = "true" ]; then
     EVAL_MAX_MODEL_LEN=$(compute_eval_context_length "$MODEL" "$BENCHMARK_MAX_MODEL_LEN")
@@ -120,10 +129,10 @@ run_benchmark_serving \
     --port "$PORT" \
     --backend vllm \
     --input-len "$ISL" \
-    --output-len "$OSL" \
+    --output-len "$BENCHMARK_OUTPUT_LEN" \
     --random-range-ratio "$RANDOM_RANGE_RATIO" \
-    --num-prompts "$((CONC * 10))" \
-    --max-concurrency "$CONC" \
+    --num-prompts "$BENCHMARK_NUM_PROMPTS" \
+    --max-concurrency "$BENCHMARK_MAX_CONCURRENCY" \
     --result-filename "$RESULT_FILENAME" \
     --result-dir /workspace/ \
     --trust-remote-code \
