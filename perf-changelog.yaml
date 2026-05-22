@@ -2945,3 +2945,10 @@
     - "New launch script: benchmarks/multi_node/qwen3.5_fp4_mi355x_sglang-disagg.sh"
     - "New models.yaml entry: Qwen3.5-397B-A17B-MXFP4 (aiter attn, mori transfer, fp8_e4m3 KV cache)"
   pr-link: XXX
+
+- config-keys:
+    - qwen3.5-fp4-mi355x-sglang-disagg
+  description:
+    - "Disable DP-attention on 8k1k 1P1D TP8/EP1 (match 1k1k pure-TP)"
+    - "Workaround: 8k1k dp-attn:true caused prefill moe_sorting HIP invalid-configuration on MI355X eval-only (run 26267301865)"
+  pr-link: XXX
