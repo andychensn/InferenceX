@@ -3100,3 +3100,11 @@
   description:
     - "Truncate sweep to conc=1 and conc=2 only: set conc-start=1, conc-end=2 in every search-space across all six DSR1 SGLang agg configs"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1534
+
+- config-keys:
+    - glm5-fp8-gb300-dynamo-sglang
+  description:
+    - "Add GLM-5 FP8 GB300 Dynamo SGLang disaggregated multi-node coverage using lmsysorg/sglang:v0.5.11-cu130"
+    - "1k1k and 8k1k STP hightpt and lowlat srt-slurm recipes under benchmarks/multi_node/srt-slurm-recipes/sglang/glm5/gb300-fp8/ (resolved from upstream srt-slurm PR #160 via srtctl resolve-override)"
+    - "Wire glm5/fp8 model + dynamo-sglang framework branches into runners/launch_gb300-nv.sh with SA upstream defaults (SLURM_PARTITION=batch_1, SLURM_ACCOUNT=benchmark, SQUASH_FILE under /home/sa-shared/gharunners/squash/)"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXXX
