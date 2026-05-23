@@ -42,12 +42,6 @@ elif [[ $MODEL_PREFIX == "dsv4" && $PRECISION == "fp4" && $FRAMEWORK == "dynamo-
 elif [[ $MODEL_PREFIX == "minimaxm2.5" && $PRECISION == "fp4" && $FRAMEWORK == "dynamo-vllm" ]]; then
     export MODEL_PATH="/data/models/MiniMax-M2.5-NVFP4"
     export SRT_SLURM_MODEL_PREFIX="minimax-m2.5-nvfp4"
-    # The GHA runner user for the minimax sweep can't use the default
-    # `benchmark` account (sbatch rejects with "Invalid account or
-    # account/partition combination"). Historical b300 single-node
-    # minimax (commit 5f314bf1) used `restricted` for the same reason.
-    # Keep batch_1 partition; only override the account.
-    SLURM_ACCOUNT="restricted"
 else
     echo "Unsupported model: $MODEL_PREFIX-$PRECISION. Supported models are: dsr1-fp4, dsr1-fp8, dsv4-fp4 with dynamo-vllm, minimaxm2.5-fp4 with dynamo-vllm"
     exit 1
