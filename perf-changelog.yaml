@@ -3115,6 +3115,22 @@
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1514
 
 - config-keys:
+    - minimaxm2.5-fp8-h100-vllm
+  description:
+    - "Update minimaxm2.5-fp8-h100-vllm recipe (v0.19.1)"
+    - "Image: vllm/vllm-openai:v0.21.0 -> v0.19.1-cu130"
+    - "Replace recipe flags: drop PIECEWISE/0.90 mem util/256 max-num-seqs/no-prefix-caching/explicit max-model-len; add --enable-auto-tool-choice, --tool-call-parser minimax_m2, --reasoning-parser minimax_m2_append_think, --compilation-config mode:3+fuse_minimax_qk_norm"
+    - "Search-space: tp:8 ep:8 (TEP=8), conc-end 128 chosen at saturation per local sweep"
+    - "Local bench: TEP=8 peaks at C=128 with 26923 tot tps (+178% vs TEP=4 peak at C=32 in May 6 j11600242 sweep)"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1516
+
+- config-keys:
+    - qwen3.5-fp8-mi355x-atom-mtp
+  description:
+    - "Add --use-chat-template to run_benchmark_serving so prompts are formatted with the Qwen chat template (matching the other Qwen MTP recipes)"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1555
+  
+- config-keys:
     - minimaxm2.5-fp4-b300-dynamo-vllm
   description:
     - "Add MiniMax-M2.5 NVFP4 B300 disaggregated multinode vLLM benchmarks via Dynamo (mirror of the GB300 pareto sweep, repacked for B300's 8 GPUs/node)"
@@ -3122,7 +3138,7 @@
     - "Same 1k/1k and 8k/1k search space as gb300, plus a new tp8-1p1d at low concurrencies for both ISLs"
     - "Recipes under benchmarks/multi_node/srt-slurm-recipes/vllm/minimax-m2.5-b300/ with gpus_per_node=8 and worker repacking for B300 topology"
     - "Wire minimax b300 launch path through runners/launch_b300-nv.sh and minimax-specific srt-slurm fork branch (lijas/spread-workers)"
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXXX
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1560
 
 - config-keys:
     - minimaxm2.5-fp4-gb300-dynamo-vllm
@@ -3130,4 +3146,4 @@
     - "Reactivate GB300 minimax disagg vLLM sweep with the pruned pareto-only search space from internal PR57"
     - "Add minimax model routing and minimax srt-slurm fork path in runners/launch_gb300-nv.sh while keeping SA upstream defaults (SLURM_PARTITION=batch_1, SLURM_ACCOUNT=benchmark, SQUASH_FILE under /home/sa-shared/gharunners/squash/)"
     - "Add 1k1k/8k1k minimax recipe set under benchmarks/multi_node/srt-slurm-recipes/vllm/minimax-m2.5/"
-  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/XXXX
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1560
