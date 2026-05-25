@@ -9789,7 +9789,7 @@ minimaxm2.5-fp4-b300-dynamo-vllm:
           tp: 4
           ep: 4
           dp-attn: false
-      - conc-list: [384, 512]
+      - conc-list: [384]
         prefill:
           num-worker: 4
           tp: 1
