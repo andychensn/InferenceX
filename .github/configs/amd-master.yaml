@@ -642,7 +642,7 @@ kimik2.5-fp4-mi355x-atom:
       - { tp: 8, conc-start: 4, conc-end: 128 }
       - { tp: 4, conc-start: 4, conc-end: 128 }
 
-dsv4-fp4-b300-vllm-agentic:
+dsv4-fp4-mi355x-vllm-agentic:
   image: vllm/vllm-openai-rocm:v0.21.0
   model: deepseek-ai/DeepSeek-V4-Pro
   model-prefix: dsv4
