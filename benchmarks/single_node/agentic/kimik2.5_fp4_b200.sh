@@ -99,9 +99,7 @@ case "$OFFLOADING" in
         # RSS + page cache. Eager mode (the shortcut form default) is
         # intentional here per user request — Kimi FP4 on B200 has cleared
         # the full eager sweep before.
-        #(srok), internal node limitation
-        #TOTAL_CPU_DRAM_GB=2500
-        TOTAL_CPU_DRAM_GB=1500
+        TOTAL_CPU_DRAM_GB=2500
         export VLLM_USE_SIMPLE_KV_OFFLOAD=1
         OFFLOAD_ARGS=(
             --kv_offloading_backend native
@@ -121,9 +119,7 @@ case "$OFFLOADING" in
         # --kv-offloading-size through vLLM's integrated LMCache convenience
         # path, which divides the value by TP and then hits a large single-shot
         # cudaHostAlloc in LMCache 0.4.5's single-process local CPU backend.
-        #(srok), internal node limitation
-        #TOTAL_CPU_DRAM_GB=2500
-        TOTAL_CPU_DRAM_GB=1500
+        TOTAL_CPU_DRAM_GB=2500
         LMCACHE_HOST="${LMCACHE_HOST:-127.0.0.1}"
         LMCACHE_PORT="${LMCACHE_PORT:-5555}"
         LMCACHE_HTTP_PORT="${LMCACHE_HTTP_PORT:-8080}"
