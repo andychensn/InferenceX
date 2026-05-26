@@ -2307,3 +2307,11 @@
     - "Tune DSv4 FP4 MI355X SGLang runtime envs: enable aiter MHC pre/post, and enable triton swa prepare kernel."
     - "Add --context-length. Add --enable-prefill-delayer for dp config"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1300
+
+- config-keys:
+    - glm5-fp4-mi355x-sglang-disagg
+  description:
+    - "Add GLM-5 MXFP4 MI355X SGLang PD-disaggregation (mirrors glm5-fp8-mi355x-sglang-disagg)"
+    - "Image: lmsysorg/sglang-rocm:v0.5.12.post1-rocm720-mi35x-20260523; model: amd/GLM-5-MXFP4; 1P1D TP8/EP1 dp-attn false; conc [8..512]"
+    - "models.yaml GLM-5-MXFP4 entry (NSA tilelang + fp8 KV cache); launcher glm5_fp4_mi355x_sglang-disagg.sh; MoRI conn.py overlay via job.slurm"
+  pr-link: XXX
