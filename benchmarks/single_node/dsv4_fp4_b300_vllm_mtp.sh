@@ -71,11 +71,13 @@ BENCHMARK_MAX_MODEL_LEN=$MAX_MODEL_LEN
 BENCHMARK_OUTPUT_LEN=$OSL
 BENCHMARK_NUM_PROMPTS=$((CONC * 10))
 BENCHMARK_MAX_CONCURRENCY=$CONC
+BENCHMARK_NUM_WARMUPS=$((2 * BENCHMARK_MAX_CONCURRENCY))
 
 if [[ "${PROFILE:-}" == "1" && "$MODEL" == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
     BENCHMARK_OUTPUT_LEN=1
     BENCHMARK_NUM_PROMPTS=256
     BENCHMARK_MAX_CONCURRENCY=256
+    BENCHMARK_NUM_WARMUPS=4096
 fi
 
 if [ "${EVAL_ONLY}" = "true" ]; then
@@ -133,6 +135,7 @@ run_benchmark_serving \
     --random-range-ratio "$RANDOM_RANGE_RATIO" \
     --num-prompts "$BENCHMARK_NUM_PROMPTS" \
     --max-concurrency "$BENCHMARK_MAX_CONCURRENCY" \
+    --num-warmups "$BENCHMARK_NUM_WARMUPS" \
     --result-filename "$RESULT_FILENAME" \
     --result-dir /workspace/ \
     --trust-remote-code \
