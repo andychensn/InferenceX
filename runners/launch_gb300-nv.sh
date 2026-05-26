@@ -25,7 +25,7 @@ elif [[ $MODEL_PREFIX == "glm5" && $PRECISION == "fp4" ]]; then
     export MODEL_PATH=/scratch/models/GLM-5-NVFP4
     export SRT_SLURM_MODEL_PREFIX="glm-5-fp4"
 elif [[ $MODEL_PREFIX == "minimaxm2.5" && $PRECISION == "fp4" ]]; then
-    export MODEL_PATH=/data/models/MiniMax-M2.5-NVFP4
+    export MODEL_PATH=/scratch/models/MiniMax-M2.5-NVFP4
     export SRT_SLURM_MODEL_PREFIX="minimax-m2.5-nvfp4"
 else
     echo "Unsupported model: $MODEL_PREFIX-$PRECISION. Supported models are: dsr1-fp4, dsr1-fp8, dsv4-fp4, glm5-fp4, minimaxm2.5-fp4"
