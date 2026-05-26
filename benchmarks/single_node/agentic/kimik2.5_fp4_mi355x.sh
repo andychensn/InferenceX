@@ -521,6 +521,7 @@ case "$OFFLOADING" in
         LMCACHE_CHUNK_SIZE="${LMCACHE_CHUNK_SIZE:-256}"
         LMCACHE_MAX_WORKERS="${LMCACHE_MAX_WORKERS:-$TP}"
         export PYTHONHASHSEED="${PYTHONHASHSEED:-0}"
+        export LMCACHE_BLOCKING_TIMEOUT_SECS=60
 
         echo "Starting LMCache MP server..."
         LMCACHE_CMD=(
