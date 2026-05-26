@@ -241,17 +241,19 @@ jobs:
           fi
 
           trace_path="profile_${res_name}.trace.json.gz"
-          if [ ! -f "$trace_path" ] && [ -d LOGS/profiles ]; then
+          if [ ! -f "$trace_path" ] && [ -d LOGS ]; then
             trace_candidate="$(python3 - <<'PY'
           from pathlib import Path
 
-          root = Path("LOGS/profiles")
+          root = Path("LOGS")
           candidates = [
               p for p in root.rglob("*")
               if p.is_file() and (
                   p.name.endswith(".trace.json")
                   or p.name.endswith(".trace.json.gz")
                   or p.name.endswith(".pt.trace.json")
+                  or p.name.endswith(".pt.trace.json.gz")
+                  or p.name.endswith(".json.gz")
                   or p.name.endswith(".json")
               )
           ]
@@ -293,6 +295,11 @@ jobs:
             fi
           else
             echo "Profile trace not found: $trace_path" >&2
+            if [ -d LOGS ]; then
+              echo "LOGS profile candidates:" >&2
+              find LOGS -maxdepth 8 -type f \( -path "*/profiles/*" -o -name "*trace*" -o -name "*profile*" \) -printf "%p %s bytes\n" 2>/dev/null | sort >&2 || true
+            fi
+            exit 1
           fi
 
       - name: Process result (json -> agg)
