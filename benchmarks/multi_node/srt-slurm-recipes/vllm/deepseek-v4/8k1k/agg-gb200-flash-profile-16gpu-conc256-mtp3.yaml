@@ -1,7 +1,7 @@
-name: "svf-vllm-agg-gb200-profile-16gpu-conc256-mtp3"
+name: "svf-vllm-agg-gb200-flash-profile-16gpu-conc256-mtp3"
 
 model:
-  path: "deepseek-v4-pro"
+  path: "deepseek-v4-flash"
   container: "vllm/vllm-openai:v0.21.0-ubuntu2404"
   precision: "fp4"
 
@@ -52,7 +52,7 @@ backend:
     NCCL_P2P_LEVEL: NVL
   vllm_config:
     aggregated:
-      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      served-model-name: "deepseek-ai/DeepSeek-V4-Flash"
       kv-cache-dtype: "fp8"
       tensor-parallel-size: 1
       pipeline-parallel-size: 1
@@ -100,8 +100,7 @@ benchmark:
 
 identity:
   model:
-    repo: "deepseek-ai/DeepSeek-V4-Pro"
-    revision: "0366e4e064385807ea86b088a5c6c878ff23343b"
+    repo: "deepseek-ai/DeepSeek-V4-Flash"
   container:
     image: "vllm/vllm-openai:v0.21.0-ubuntu2404"
   frameworks:

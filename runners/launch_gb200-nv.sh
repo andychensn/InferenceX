@@ -19,8 +19,13 @@ if [[ $FRAMEWORK == "dynamo-sglang" ]]; then
         # Same compute-node-local NVMe path as the dynamo-vllm dsv4
         # branch — see that branch for rationale. SRT_SLURM_MODEL_PREFIX
         # matches the model.path alias in our DSV4 sglang recipes.
-        export MODEL_PATH="/mnt/numa1/models/deepseek-v4-pro/"
-        export SRT_SLURM_MODEL_PREFIX="deepseek-v4-pro"
+        if [[ $MODEL == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
+            export MODEL_PATH="/mnt/numa1/models/deepseek-v4-flash/"
+            export SRT_SLURM_MODEL_PREFIX="deepseek-v4-flash"
+        else
+            export MODEL_PATH="/mnt/numa1/models/deepseek-v4-pro/"
+            export SRT_SLURM_MODEL_PREFIX="deepseek-v4-pro"
+        fi
     else
         export MODEL_PATH=$MODEL
     fi
@@ -52,8 +57,13 @@ elif [[ $FRAMEWORK == "dynamo-vllm" ]]; then
         # Weights live on compute-node local NVMe (/mnt/numa1) — no Lustre
         # contention, fast startup. SRT_SLURM_MODEL_PREFIX matches the
         # model.path alias in our DSV4 recipes.
-        export MODEL_PATH="/mnt/numa1/models/deepseek-v4-pro/"
-        export SRT_SLURM_MODEL_PREFIX="deepseek-v4-pro"
+        if [[ $MODEL == "deepseek-ai/DeepSeek-V4-Flash" ]]; then
+            export MODEL_PATH="/mnt/numa1/models/deepseek-v4-flash/"
+            export SRT_SLURM_MODEL_PREFIX="deepseek-v4-flash"
+        else
+            export MODEL_PATH="/mnt/numa1/models/deepseek-v4-pro/"
+            export SRT_SLURM_MODEL_PREFIX="deepseek-v4-pro"
+        fi
     else
         echo "Unsupported model prefix/precision combination: $MODEL_PREFIX/$PRECISION. Supported combinations for dynamo-vllm: kimik2.5/fp4, dsv4/fp4"
         exit 1

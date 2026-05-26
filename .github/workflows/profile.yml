@@ -355,6 +355,7 @@ jobs:
         id: push
         env:
           TRACE_LOCAL: ${{ steps.run.outputs.trace }}
+          REPO_PAT: ${{ secrets.REPO_PAT }}
         shell: bash
         run: |
           set -euo pipefail
@@ -366,9 +367,10 @@ jobs:
           pushd storage >/dev/null
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+          git remote set-url origin "https://x-access-token:${REPO_PAT}@github.com/SemiAnalysisAI/InferenceX-trace-storage.git"
           git add -A
           git commit -m "Add profile: ${GITHUB_SHA} ${RESULT_FILENAME}" || echo "Nothing to commit"
-          git push
+          git push origin HEAD:master
           STORAGE_SHA="$(git rev-parse HEAD)"
           popd >/dev/null
 
