@@ -951,13 +951,12 @@ install_agentic_deps() {
 build_replay_cmd() {
     # aiperf invocation for the inferencex-agentx-mvp scenario.
     #
-    # Live-assistant mode is the default
-    # (AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES=1): the loader emits
-    # user-only deltas and the worker threads the server's live assistant
-    # response back into the session. Set
-    # AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES=0 explicitly to compare
-    # against pre-canned assistant replay, where the server response is
-    # discarded for future prompt construction.
+    # Pre-canned assistant replay is the default: recorded assistant responses
+    # are used for future prompt construction, and live server responses are
+    # discarded. Set AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES=1 explicitly
+    # to use live-assistant mode, where the loader emits user-only deltas and
+    # the worker threads the server's live assistant response back into the
+    # session.
     #
     # The scenario plugin locks: --cache-bust first_turn_prefix and
     # --trace-idle-gap-cap-seconds 60 (per-trace idle-gap compression
@@ -968,7 +967,7 @@ build_replay_cmd() {
     local result_dir="$1"
     local duration="${DURATION:-1800}"
 
-    export AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES="${AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES:-1}"
+    export AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES="${AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES:-0}"
     # Dataset configuration (load + reconstruct + inputs.json + mmap)
     # routinely takes 4-5 min for the 949-trace weka corpus on fast /tmp
     # (B300) but can stretch to 14 min on slower /tmp + parallel contention
