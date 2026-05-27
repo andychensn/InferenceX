@@ -119,7 +119,10 @@ def _load_tokenizer(tokenizer_id, tokenizer_mode, trust_remote_code):
                 tokenizer_mode=tokenizer_mode,
                 trust_remote_code=trust_remote_code,
             )
-        except ImportError:
+        except (ImportError, AttributeError) as fallback_exc:
+            if (isinstance(fallback_exc, AttributeError)
+                    and "all_special_tokens_extended" not in str(fallback_exc)):
+                raise
             from transformers import AutoTokenizer
             use_fast = tokenizer_mode != "slow"
             return AutoTokenizer.from_pretrained(
