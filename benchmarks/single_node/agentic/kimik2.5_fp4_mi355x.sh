@@ -14,14 +14,8 @@ set -x
 
 source "$(dirname "$0")/../../benchmark_lib.sh"
 
-check_env_vars MODEL TP CONC OFFLOADING TOTAL_CPU_DRAM_GB RESULT_DIR
+check_env_vars MODEL TP CONC OFFLOADING TOTAL_CPU_DRAM_GB RESULT_DIR DURATION EP_SIZE
 
-PORT=${PORT:-8888}
-DURATION=${DURATION:-1800}
-MAX_DELAY=${MAX_DELAY:-60}
-ADVANCE_MIN=${ADVANCE_MIN:-0.0}
-ADVANCE_MAX=${ADVANCE_MAX:-0.7}
-EP_SIZE=${EP_SIZE:-1}
 # Kimi-K2.5 advertises a 262144-token context window in vLLM 0.21.0.
 # Matrix defaults may export MAX_MODEL_LEN=0 to mean "server default"; for this
 # script we need the concrete value so AgentX filters prompt+max_tokens against

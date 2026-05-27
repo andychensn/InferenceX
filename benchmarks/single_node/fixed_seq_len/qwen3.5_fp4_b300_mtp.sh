@@ -29,7 +29,6 @@ export SGLANG_ENABLE_FLASHINFER_GEMM=true
 export PYTHONUNBUFFERED=1
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 # Default: recv every ~10 requests; if CONC >= 16, relax to ~30 requests between scheduler recv polls.
 if [[ $CONC -ge 16 ]]; then

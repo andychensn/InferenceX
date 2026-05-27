@@ -28,7 +28,6 @@ nvidia-smi
 if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 # DeepSeek-V4-Pro weights are large; engine startup can exceed the default
 # 600s. Give it an hour to load.

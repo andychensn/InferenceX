@@ -55,7 +55,6 @@ fi
 echo "MOE_BACKEND='$MOE_BACKEND', MTP='$MTP'"
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 EXTRA_CONFIG_FILE="dsr1-fp8-mtp.yml"
 
 cat > $EXTRA_CONFIG_FILE << EOF

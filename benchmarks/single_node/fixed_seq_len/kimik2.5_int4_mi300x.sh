@@ -24,7 +24,6 @@ if [ -n "$ROCR_VISIBLE_DEVICES" ]; then
 fi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 # following AMD andy luo's recipe
 # https://x.com/linluo77/status/2017024513595301985

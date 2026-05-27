@@ -83,7 +83,6 @@ export SGLANG_OPT_USE_FUSED_PAGED_COMPRESS=true
 export SGLANG_OPT_USE_MULTI_STREAM_OVERLAP=0
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 EVAL_CONTEXT_ARGS=""
 if [ "${EVAL_ONLY}" = "true" ]; then

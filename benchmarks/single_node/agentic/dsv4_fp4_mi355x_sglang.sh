@@ -16,12 +16,8 @@ set -x
 
 source "$(dirname "$0")/../../benchmark_lib.sh"
 
-check_env_vars MODEL TP CONC OFFLOADING TOTAL_CPU_DRAM_GB RESULT_DIR
+check_env_vars MODEL TP CONC OFFLOADING TOTAL_CPU_DRAM_GB RESULT_DIR DURATION EP_SIZE DP_ATTENTION
 
-PORT=${PORT:-8888}
-DURATION=${DURATION:-1800}
-EP_SIZE=${EP_SIZE:-1}
-DP_ATTENTION=${DP_ATTENTION:-false}
 if [ -z "${MAX_MODEL_LEN:-}" ] || [ "$MAX_MODEL_LEN" = "0" ]; then
     MAX_MODEL_LEN=1000000
 fi

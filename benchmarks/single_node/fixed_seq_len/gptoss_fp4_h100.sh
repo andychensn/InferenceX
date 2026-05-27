@@ -34,7 +34,6 @@ EOF
 export PYTHONNOUSERSITE=1
 export VLLM_MXFP4_USE_MARLIN=1
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 # Start GPU monitoring (power, temperature, clocks every second)
 start_gpu_monitor

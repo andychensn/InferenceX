@@ -19,7 +19,6 @@ pip3 install --user --break-system-packages sentencepiece
 
 if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 # Start GPU monitoring (power, temperature, clocks every second)
 start_gpu_monitor

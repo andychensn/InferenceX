@@ -31,7 +31,6 @@ export RCCL_MSCCL_ENABLE=0
 export ROCM_QUICK_REDUCE_QUANTIZATION=INT4
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 # Keep server-side speculative decoding capacity aligned with the matrix row.
 MAX_RUNNING_REQUESTS="${MAX_RUNNING_REQUESTS:-$CONC}"

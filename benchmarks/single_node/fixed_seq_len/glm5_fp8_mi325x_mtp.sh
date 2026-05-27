@@ -22,7 +22,6 @@ fi
 if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 CONTEXT_LENGTH=$((ISL + OSL + 20))
 MAX_PREFILL_TOKENS=32768
 

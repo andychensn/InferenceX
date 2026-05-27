@@ -9,6 +9,13 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/tmp/inferencex-pycache}"
 mkdir -p "$PYTHONPYCACHEPREFIX" 2>/dev/null || true
 
+# Inference server port shared by every benchmark recipe. Launchers that need
+# a non-default value (e.g. launch_mi355x-amds.sh derives PORT from RUNNER_NAME
+# to avoid collisions across concurrent gh-runners on a shared host) set PORT
+# themselves before sourcing this file; the `:-` fallback only kicks in when
+# nothing upstream set it.
+export PORT="${PORT:-8888}"
+
 # --------------------------------
 # GPU monitoring helpers
 # --------------------------------
@@ -965,7 +972,7 @@ build_replay_cmd() {
     # and auto-injects them — so we do not pass them. See
     # utils/aiperf/docs/tutorials/agentx-mvp.md.
     local result_dir="$1"
-    local duration="${DURATION:-1800}"
+    local duration="$DURATION"
 
     export AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES="${AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES:-0}"
     # Dataset configuration (load + reconstruct + inputs.json + mmap)

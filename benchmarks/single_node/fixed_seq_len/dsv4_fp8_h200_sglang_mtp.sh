@@ -20,7 +20,6 @@ if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 nvidia-smi
 
 SERVER_LOG="$PWD/server.log"
-PORT=${PORT:-8888}
 
 echo "TP: $TP, CONC: $CONC, ISL: $ISL, OSL: $OSL"
 

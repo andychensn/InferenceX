@@ -35,7 +35,6 @@ export SGLANG_OPT_USE_CUSTOM_ALL_REDUCE_V2=1
 # Drop the runner conditional once lmsys moves sglang back out of /workspace.
 
 SERVER_LOG="$PWD/server.log"
-PORT=${PORT:-8888}
 
 echo "TP: $TP, DP_ATTENTION: $DP_ATTENTION, CONC: $CONC, ISL: $ISL, OSL: $OSL"
 

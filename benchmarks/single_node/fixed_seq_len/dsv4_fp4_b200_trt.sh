@@ -54,7 +54,6 @@ fi
 nvidia-smi
 
 SERVER_LOG="$PWD/server.log"
-PORT=${PORT:-8888}
 EXTRA_CONFIG_FILE="dsv4-fp4-trt.yml"
 
 MOE_BACKEND="TRTLLM"

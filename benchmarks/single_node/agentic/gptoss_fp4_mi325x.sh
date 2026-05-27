@@ -9,13 +9,8 @@ set -x
 
 source "$(dirname "$0")/../../benchmark_lib.sh"
 
-check_env_vars MODEL TP CONC OFFLOADING TOTAL_CPU_DRAM_GB RESULT_DIR
+check_env_vars MODEL TP CONC OFFLOADING TOTAL_CPU_DRAM_GB RESULT_DIR DURATION
 
-PORT=${PORT:-8888}
-DURATION=${DURATION:-1800}
-MAX_DELAY=${MAX_DELAY:-60}
-ADVANCE_MIN=${ADVANCE_MIN:-0.0}
-ADVANCE_MAX=${ADVANCE_MAX:-0.7}
 # Agentic matrix entries don't set max-model-len, so the workflow passes 0.
 # ${:-DEFAULT} only fires on unset/empty, so handle 0 explicitly.
 if [ -z "${MAX_MODEL_LEN:-}" ] || [ "$MAX_MODEL_LEN" = "0" ]; then

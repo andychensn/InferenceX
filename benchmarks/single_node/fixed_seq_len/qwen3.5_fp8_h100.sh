@@ -28,7 +28,6 @@ nvidia-smi
 if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 MAX_SEQ_LEN=$((ISL + OSL + 20))
 if [ "${EVAL_ONLY}" = "true" ]; then
     setup_eval_context

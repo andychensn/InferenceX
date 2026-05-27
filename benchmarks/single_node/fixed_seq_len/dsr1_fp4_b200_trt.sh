@@ -41,7 +41,6 @@ fi
 echo "MOE_BACKEND set to '$MOE_BACKEND'"
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 EXTRA_CONFIG_FILE="dsr1-fp4.yml"
 
 cat > $EXTRA_CONFIG_FILE << EOF

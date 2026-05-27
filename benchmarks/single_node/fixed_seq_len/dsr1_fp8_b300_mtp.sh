@@ -27,7 +27,6 @@ if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 export SGLANG_ENABLE_JIT_DEEPGEMM=false
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 # MTP only supports TP=8 for now
 if [[ $TP -ne 8 ]]; then

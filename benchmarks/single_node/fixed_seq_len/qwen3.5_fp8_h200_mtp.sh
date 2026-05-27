@@ -22,7 +22,6 @@ nvidia-smi
 if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 # MTP (Multi-Token Prediction) Config - EAGLE speculative decoding
 SPECULATIVE_NUM_STEPS=3

@@ -41,7 +41,6 @@ ATTN_BACKEND="--attention-backend ROCM_AITER_UNIFIED_ATTN"
 FUSE_ROPE_KVCACHE="-cc.pass_config.fuse_rope_kvcache=True -cc.use_inductor_graph_partition=True"
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 if [ "${EVAL_ONLY}" = "true" ]; then
     setup_eval_context

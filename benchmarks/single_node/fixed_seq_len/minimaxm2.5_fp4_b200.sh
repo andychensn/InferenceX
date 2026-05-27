@@ -23,7 +23,6 @@ nvidia-smi
 if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 export VLLM_FLOAT32_MATMUL_PRECISION=high
 

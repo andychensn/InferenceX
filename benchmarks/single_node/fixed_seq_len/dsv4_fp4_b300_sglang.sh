@@ -40,7 +40,6 @@ export SGLANG_OPT_USE_CUSTOM_ALL_REDUCE_V2=1
 # /workspace.
 
 SERVER_LOG="$PWD/server.log"
-PORT=${PORT:-8888}
 
 echo "TP: $TP, DP_ATTENTION: $DP_ATTENTION, CONC: $CONC, ISL: $ISL, OSL: $OSL"
 

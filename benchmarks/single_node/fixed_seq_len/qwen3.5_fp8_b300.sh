@@ -19,7 +19,6 @@ fi
 nvidia-smi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 CONTEXT_LENGTH=$((ISL + OSL + 20))
 if [ "${EVAL_ONLY}" = "true" ]; then

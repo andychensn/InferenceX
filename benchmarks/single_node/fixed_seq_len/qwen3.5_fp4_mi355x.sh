@@ -20,7 +20,6 @@ if [[ "$MODEL" != /* ]]; then hf download "$MODEL"; fi
 export SGLANG_USE_AITER=1
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 MEM_FRAC_STATIC=${MEM_FRAC_STATIC:-0.8}
 
 if [ "${EVAL_ONLY}" = "true" ]; then

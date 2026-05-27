@@ -25,7 +25,6 @@ export RCCL_MSCCL_ENABLE=0
 export ROCM_QUICK_REDUCE_QUANTIZATION=INT4
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 EVAL_CONTEXT_ARGS=""
 if [ "${EVAL_ONLY}" = "true" ]; then

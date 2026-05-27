@@ -65,7 +65,6 @@ elif [[ "$ISL" == "8192" && "$OSL" == "1024" ]]; then
 fi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 if [ "${EVAL_ONLY}" = "true" ]; then
     setup_eval_context

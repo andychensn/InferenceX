@@ -23,7 +23,6 @@ export ROCM_QUICK_REDUCE_QUANTIZATION=INT4
 export SAFETENSORS_FAST_GPU=1
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 EVAL_CONTEXT_ARGS=""
 if [ "${EVAL_ONLY}" = "true" ]; then

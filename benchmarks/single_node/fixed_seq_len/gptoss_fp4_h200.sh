@@ -47,7 +47,6 @@ EOF
 
 SERVER_LOG=/workspace/server.log
 export TORCH_CUDA_ARCH_LIST="9.0"
-PORT=${PORT:-8888}
 
 export VLLM_MXFP4_USE_MARLIN=1
 

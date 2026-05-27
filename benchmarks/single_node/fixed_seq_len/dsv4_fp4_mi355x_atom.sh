@@ -20,7 +20,6 @@ fi
 echo "TP: $TP, CONC: $CONC, ISL: $ISL, OSL: $OSL, EP_SIZE: $EP_SIZE, DP_ATTENTION: $DP_ATTENTION"
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 if [ "$EP_SIZE" -gt 1 ]; then
   EP=" --enable-expert-parallel"

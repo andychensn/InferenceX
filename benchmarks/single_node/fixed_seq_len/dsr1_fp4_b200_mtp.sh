@@ -31,7 +31,6 @@ if [[ $TP -ne 8 ]]; then
 fi
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 if [[ $CONC -ge 16 ]]; then
   SCHEDULER_RECV_INTERVAL=30

@@ -34,7 +34,6 @@ fi
 echo "MOE_BACKEND='$MOE_BACKEND', MTP='$MTP'"
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 EXTRA_CONFIG_FILE="dsr1-fp8-mtp.yml"
 
 # If ISL=8192 and DP_ATTENTION=true, export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:8192

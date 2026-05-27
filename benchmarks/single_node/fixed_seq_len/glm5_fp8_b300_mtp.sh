@@ -33,7 +33,6 @@ export SGL_ENABLE_JIT_DEEPGEMM=0
 export SGLANG_ENABLE_SPEC_V2=1
 
 SERVER_LOG=/workspace/server.log
-PORT=${PORT:-8888}
 
 
 echo "CONC: $CONC, ISL: $ISL, OSL: $OSL"
