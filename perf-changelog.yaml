@@ -3213,3 +3213,11 @@
     - "The AMD amd_utils SLURM job has no orchestrator perfmon, so each SGLang/vLLM disagg node starts its own amd-smi monitor via start_perf_monitor (benchmarks/benchmark_lib.sh), writing perf_samples_<role>_w<idx>_<host>.csv into the NFS-shared /benchmark_logs/perfmon mount (wired in amd_utils/job.slurm). launch_mi355x-amds.sh collects the per-node CSVs into the GH workspace before the EXIT trap wipes the logs dir and sets GPU_METRICS_CSV_GLOB so the existing Process-result step runs the same vendor-agnostic utils/aggregate_power.py used for NVIDIA: per-source GPU-id namespacing (8 GPUs/node on MI355X, so a TP16 worker over 2 nodes counts 16 GPUs not 8), per-stage prefill/decode energy attribution, and per-worker temp/util/mem when amd-smi exposes those columns."
     - "Covers both engine paths: SGLang disagg (server_sglang.sh role = NODE_RANK bucketed by PREFILL_NODES_PER_WORKER / NODE_OFFSET) and vLLM disagg (server_vllm.sh one worker per node, ranks [0,xP) prefill / [xP,xP+yD) decode). Monitoring is best-effort end-to-end — a missing amd-smi or empty CSV skips power patching without failing the benchmark upload; DISAGG=true threads through to per-stage attribution while agg/non-disagg runs still get cluster-wide power."
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1574
+
+- config-keys:
+    - qwen3.5-fp4-mi355x-sglang-disagg
+  description:
+    - "Add Qwen3.5-397B-A17B-MXFP4 MI355X SGLang PD-disaggregation"
+    - "Bump image to lmsysorg/sglang-rocm:v0.5.12.post1-rocm720-mi35x-20260523, 1P1D TP8/EP1, dp-attn false, conc [8..512]"
+    - "MoRI conn.py overlay (48e459bd) via job.slurm; launcher qwen3.5_fp4_mi355x_sglang-disagg.sh"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1579
