@@ -84,6 +84,17 @@ esac
 echo "Starting SGLang server..."
 export PYTHONNOUSERSITE=1
 
+SGLANG_MULTI_TOKENIZER=/sgl-workspace/sglang/python/sglang/srt/managers/multi_tokenizer_mixin.py
+if ! sed -n '/elif isinstance(output, BatchStrOutput):/,/input_token_logprobs_val=_extract_field_by_index/p' "$SGLANG_MULTI_TOKENIZER" \
+    | grep -q 'cached_tokens_details=_extract_field_by_index'; then
+    sed -i '/elif isinstance(output, BatchStrOutput):/,/input_token_logprobs_val=_extract_field_by_index/ {
+        /cached_tokens=_extract_field_by_index(output, "cached_tokens", i),/a\
+            cached_tokens_details=_extract_field_by_index(\
+                output, "cached_tokens_details", i\
+            ),
+    }' "$SGLANG_MULTI_TOKENIZER"
+fi
+
 { set +x; } 2>/dev/null
 SGLANG_CMD=(
     python3 -m sglang.launch_server
@@ -100,14 +111,14 @@ SGLANG_CMD=(
     --mamba-ssm-dtype bfloat16
     --attention-backend flashinfer
     --enable-flashinfer-allreduce-fusion
-    --cuda-graph-max-bs "$CONC"
-    --max-running-requests "$CONC"
-    --max-prefill-tokens 8192
-    --chunked-prefill-size 8192
+    # --cuda-graph-max-bs "$CONC"
+    # --max-running-requests "$CONC"
+    # --max-prefill-tokens 8192
+    # --chunked-prefill-size 8192
     --mem-fraction-static 0.75
     --stream-interval 50
     --scheduler-recv-interval "$SCHEDULER_RECV_INTERVAL"
-    # --tokenizer-worker-num 6
+    --tokenizer-worker-num 6
     --tokenizer-path "$MODEL"
     --enable-metrics
     "${CACHE_ARGS[@]}"
