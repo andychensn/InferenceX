@@ -22,9 +22,9 @@ MAX_DELAY=${MAX_DELAY:-60}
 ADVANCE_MIN=${ADVANCE_MIN:-0.0}
 ADVANCE_MAX=${ADVANCE_MAX:-0.7}
 EP_SIZE=${EP_SIZE:-1}
-#if [[ -z "${MAX_MODEL_LEN:-}" || "$MAX_MODEL_LEN" == "0" ]]; then
-#    MAX_MODEL_LEN=262144
-#fi
+if [[ -z "${MAX_MODEL_LEN:-}" || "$MAX_MODEL_LEN" == "0" ]]; then
+    MAX_MODEL_LEN=169472
+fi
 
 if [[ -n "${SLURM_JOB_ID:-}" ]]; then
     echo "JOB $SLURM_JOB_ID running on ${SLURMD_NODENAME:-unknown}"
@@ -45,11 +45,6 @@ install_agentic_deps
 
 # Install amd-quark for MXFP4 (manual install due to ROCm vLLM bug)
 pip install amd-quark
-
-# Disable AITER RMSNorm for TP < 8 due to accuracy issues
-if [ "${TP}" -lt 8 ]; then
-  export VLLM_ROCM_USE_AITER_RMSNORM=0
-fi
 
 # Workaround for MEC FW <177 RCCL memory reclaim issue
 version=$(rocm-smi --showfw 2>/dev/null | grep MEC | head -n 1 | awk '{print $NF}')
@@ -228,6 +223,7 @@ VLLM_CMD=(
     --distributed-executor-backend mp \
     --async-scheduling \
     --trust-remote-code
+    --max-model-len "$MAX_MODEL_LEN"
     --moe-backend triton_unfused \
     --tokenizer-mode deepseek_v4 \
     --reasoning-parser deepseek_v4 \
