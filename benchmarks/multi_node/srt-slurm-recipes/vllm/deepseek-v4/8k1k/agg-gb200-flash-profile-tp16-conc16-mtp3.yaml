@@ -1,4 +1,4 @@
-name: "svf-vllm-agg-gb200-flash-profile-16gpu-conc16-mtp3"
+name: "svf-vllm-agg-gb200-flash-profile-tp16-conc16-mtp3"
 
 model:
   path: "deepseek-v4-flash"
@@ -54,13 +54,8 @@ backend:
     aggregated:
       served-model-name: "deepseek-ai/DeepSeek-V4-Flash"
       kv-cache-dtype: "fp8"
-      tensor-parallel-size: 1
+      tensor-parallel-size: 16
       pipeline-parallel-size: 1
-      data-parallel-hybrid-lb: true
-      data-parallel-size: 16
-      data-parallel-rpc-port: 13345
-      enable-expert-parallel: true
-      enable-ep-weight-filter: true
       moe-backend: deep_gemm_mega_moe
       speculative-config: '{"method":"mtp","num_speculative_tokens":3}'
       attention-config: '{"use_fp4_indexer_cache":true}'
@@ -79,7 +74,6 @@ backend:
       stream-interval: 50
       no-disable-hybrid-kv-cache-manager: true
       enable-sleep-mode: true
-      all2all-backend: "flashinfer_nvlink_one_sided"
 
 profiling:
   type: "torch"
