@@ -213,6 +213,8 @@ gptoss-<precision>-rdu-sambastack:
 
 ## 9. How to Run
 
+> Operator runbook (fork setup, runner registration, the 4 TODOs, smoke test) lives in `benchmarks/sambastack/README.md`.
+
 **One-time:** stand up the dedicated SambaStack env (with a high-limit QoS tier in the manifest, and the benchmark key mapped to it); add the `SAMBANOVA_API_KEY` GitHub secret + one line in `benchmark-tmpl.yml` (§7); register the **single** `rdu` runner (name `rdu_0`, label `rdu`) with the kubeconfig + `API_DOMAIN` on its host; commit the artifacts in §8.
 
 **Smoke test (no changelog touch):**
