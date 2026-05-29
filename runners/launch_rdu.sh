@@ -12,7 +12,7 @@
 # There is NO teardown: on a dedicated env the bundle is persistent and stays warm
 # across sweeps; free the node manually (kubectl delete) when done with RDU.
 #
-# Credentials (see SAMBANOVA_RDU_OPTION_B_DESIGN.md §7):
+# Credentials (see benchmarks/sambastack/README.md):
 #   SAMBANOVA_API_KEY  - GitHub secret, injected via benchmark-tmpl.yml (mirrors HF_TOKEN)
 #   API_DOMAIN         - GitHub Actions Variable, or set on the runner host
 #   KUBECONFIG         - deploy-capable kubeconfig, ambient on the rdu runner host

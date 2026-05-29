@@ -1,8 +1,7 @@
 # SambaNova RDU (SambaStack hosted) — runbook
 
 Run InferenceX benchmarks on SambaNova RDU through the SambaStack **hosted**
-OpenAI-compatible endpoint. Full design + rationale: `SAMBANOVA_RDU_OPTION_B_DESIGN.md`
-(repo root).
+OpenAI-compatible endpoint.
 
 ## How it works (vs the GPU flow)
 
@@ -75,5 +74,4 @@ python utils/matrix_logic/generate_sweep_configs.py full-sweep \
 - ⚠️ Concurrency sweep capped at the bundle batch ceiling (8 at the 8K/32K seq tier).
 - ❌ **No `tokens/MW`** — power is not exposed on hosted. It is deployment-gated:
   hosted needs a SambaNova **network power API** (Case A); host-local SMI / BMC / PDU
-  require on-prem or bare-metal. The power collector is stubbed in the recipe. See
-  design doc §12.
+  require on-prem or bare-metal. The power collector is stubbed in the recipe.

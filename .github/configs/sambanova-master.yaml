@@ -2,7 +2,7 @@
 # RDU is neither NVIDIA nor AMD, so it gets its own master file; pass it explicitly
 # via --config-files .github/configs/sambanova-master.yaml.
 #
-# See SAMBANOVA_RDU_OPTION_B_DESIGN.md for the full design.
+# See benchmarks/sambastack/README.md for the runbook.
 
 gptoss-fp8-rdu-sambastack:
   # `image:` is the bundle image/chart DIGEST — the version pin. It is templated

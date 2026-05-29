@@ -29,7 +29,7 @@ check_env_vars \
 # window; aggregate_power.py then patches avg_power_w/joules_per_*token with NO
 # change. On SambaStack HOSTED this is only possible if SambaNova exposes a
 # network power API (Case A) — host-local SMI/BMC/PDU need on-prem/bare-metal.
-# See SAMBANOVA_RDU_OPTION_B_DESIGN.md §12. Until an API exists, power is omitted.
+# See benchmarks/sambastack/README.md. Until an API exists, power is omitted.
 #
 # if [[ -n "${SN_POWER_API:-}" ]]; then start_rdu_power_monitor; fi   # TODO(Phase C)
 
