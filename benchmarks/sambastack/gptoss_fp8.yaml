@@ -1,0 +1,23 @@
+# SambaStack bundle manifest for gpt-oss-120b on RDU.
+#
+# Applied by runners/launch_rdu.sh via:
+#   IMAGE=<digest> envsubst < this | kubectl apply -f -
+# so ${IMAGE} is the single source of truth = the master-config `image:` field.
+#
+# TODOs to fill from the dedicated SambaStack env:
+#   - bundle TEMPLATE name (docs use e.g. `cd-dyt-gpt-oss-120b-8-32-64-128k`,
+#     which differs from the served model-id `gpt-oss-120b`)
+#   - the actual bundleDeploymentSpecs schema fields for your SambaStack version
+#     (docs reference `minReplicas`, `groups`, `qosList`)
+#   - a high-limit `qosList` tier, and map the benchmark API key to that usergroup
+#     (rate limit must be >= max concurrency)
+#   - precision is assumed fp8 (GUESS) — confirm and rename if different
+bundles:
+  bundleSpecs:
+    - name: cd-dyt-gpt-oss-120b-8-32-64-128k   # TODO: confirm exact bundle template name
+      image: ${IMAGE}                           # templated from master-config `image:`
+  bundleDeploymentSpecs:
+    - bundle: cd-dyt-gpt-oss-120b-8-32-64-128k
+      minReplicas: 1            # one bundle per node
+      qosList:                  # TODO: configure a high/unlimited benchmark tier
+        - benchmark             #       and ensure the benchmark API key maps to it

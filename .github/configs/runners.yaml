@@ -154,3 +154,5 @@ gb300-cw:
 - 'gb300-cw_1'
 - 'gb300-cw_2'
 - 'gb300-cw_3'
+rdu:
+- 'rdu_0'   # single network-only runner ⇒ serialized sweep; kubeconfig + API_DOMAIN on its host (API key from secret)
