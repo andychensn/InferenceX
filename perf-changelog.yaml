@@ -3200,3 +3200,11 @@
     - "Bump image to lmsysorg/sglang-rocm:v0.5.12.post1-rocm720-mi35x-20260523, 1P1D TP8/EP1, dp-attn false, conc [8..512]"
     - "MoRI conn.py overlay (48e459bd) via job.slurm; launcher qwen3.5_fp4_mi355x_sglang-disagg.sh"
   pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1579
+
+- config-keys:
+    - dsv4-fp4-gb300-dynamo-sglang
+  description:
+    - "Add wide-EP sweep configs (EP=12/16/24/32/40) matching srt-slurm PR#173 topology (18 nodes total)"
+    - "EP=12 15P+3D conc=12000, EP=16 14P+4D conc=8192, EP=24 12P+6D conc=3000, EP=32 10P+8D conc=2500, EP=40 8P+10D conc=2048"
+    - "Aligned decode params with Weiliang config: swa-full-tokens-ratio=0.20, max-running-requests=18432, moe-dense-tp-size=1; added prefill enable-dp-lm-head and cuda-graph-max-bs=512"
+  pr-link: https://github.com/SemiAnalysisAI/InferenceX/pull/1586
