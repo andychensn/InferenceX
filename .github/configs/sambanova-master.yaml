@@ -1,0 +1,32 @@
+# SambaNova RDU benchmark definitions (SambaStack hosted, OpenAI-compatible endpoint).
+# RDU is neither NVIDIA nor AMD, so it gets its own master file; pass it explicitly
+# via --config-files .github/configs/sambanova-master.yaml.
+#
+# See benchmarks/sambastack/README.md for the runbook.
+
+gptoss-fp8-rdu-sambastack:
+  # `image:` is the bundle image/chart DIGEST — the version pin. It is templated
+  # into benchmarks/sambastack/gptoss_fp8.yaml at deploy time. A bump here (+ a
+  # perf-changelog entry) re-benchmarks, exactly like a GPU image bump.
+  image: "TODO-bundle-image-or-chart-digest"   # TODO: fill from the dedicated env
+  model: gpt-oss-120b                            # served model-id the bundle answers to
+  model-prefix: gptoss
+  runner: rdu
+  precision: fp8                                 # GUESS — confirm the bundle's precision
+  framework: sambastack
+  multinode: false
+  disagg: false
+  scenarios:
+    fixed-seq-len:
+      # tp = 16 (confirmed RDU count) → used only as the per-RDU divisor in
+      # process_result.py (tput_per_gpu = total / TP). Parallelism is bundle-fixed.
+      # conc-end capped at the bundle batch ceiling (8 at the 8K/32K seq tier);
+      # beyond it we measure SambaNova's queue, not throughput.
+      - isl: 1024
+        osl: 1024
+        search-space:
+          - { tp: 16, ep: 1, dp-attn: false, conc-start: 1, conc-end: 8 }
+      - isl: 8192
+        osl: 1024
+        search-space:
+          - { tp: 16, ep: 1, dp-attn: false, conc-start: 1, conc-end: 8 }

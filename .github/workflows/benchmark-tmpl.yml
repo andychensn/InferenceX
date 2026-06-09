@@ -90,6 +90,8 @@ on:
 env:
   RANDOM_RANGE_RATIO: 0.8
   HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}   # RDU endpoint auth (mirrors HF_TOKEN); empty for non-RDU runners
+  API_DOMAIN: ${{ vars.API_DOMAIN }}                    # RDU endpoint host (GitHub Actions Variable); empty for non-RDU runners
   HF_HUB_CACHE: '/mnt/hf_hub_cache/'
   EXP_NAME: ${{ inputs.exp-name }}
   MODEL: ${{ inputs.model }}
