@@ -595,13 +595,58 @@ async def benchmark(
     semaphore = (asyncio.Semaphore(max_concurrency)
                  if max_concurrency else None)
 
+    # -----------------------------------------------------------------------
+    # Debug: track per-task state so the watchdog can report what's stuck.
+    # -----------------------------------------------------------------------
+    _task_states: dict = {}   # task_id -> state string
+    _task_id_counter = [0]
+
     async def limited_request_func(request_func_input, pbar):
+        tid = _task_id_counter[0]
+        _task_id_counter[0] += 1
+        _task_states[tid] = "waiting-semaphore"
+        ts = time.perf_counter()
         if semaphore is None:
-            return await request_func(request_func_input=request_func_input,
-                                      pbar=pbar)
-        async with semaphore:
-            return await request_func(request_func_input=request_func_input,
-                                      pbar=pbar)
+            _task_states[tid] = "running"
+            result = await request_func(request_func_input=request_func_input,
+                                        pbar=pbar)
+        else:
+            async with semaphore:
+                wait_ms = (time.perf_counter() - ts) * 1000
+                _task_states[tid] = "running"
+                print(
+                    f"[SEMA] task#{tid:03d} acquired semaphore"
+                    f"  waited={wait_ms:.1f}ms"
+                    f"  url={request_func_input.api_url}",
+                    flush=True,
+                )
+                result = await request_func(
+                    request_func_input=request_func_input, pbar=pbar)
+                _task_states[tid] = "done"
+                print(
+                    f"[SEMA] task#{tid:03d} released semaphore"
+                    f"  success={result.success}"
+                    f"  total={1000*(time.perf_counter()-ts):.0f}ms",
+                    flush=True,
+                )
+        _task_states[tid] = "done"
+        return result
+
+    async def _watchdog():
+        """Print a status snapshot every 30 s while the benchmark runs."""
+        interval = 30
+        while True:
+            await asyncio.sleep(interval)
+            counts: dict = {}
+            for s in _task_states.values():
+                counts[s] = counts.get(s, 0) + 1
+            elapsed = time.perf_counter() - benchmark_start_time
+            print(
+                f"[WATCHDOG] elapsed={elapsed:.0f}s  task_states={counts}"
+                f"  semaphore_value="
+                f"{semaphore._value if semaphore else 'N/A'}",
+                flush=True,
+            )
 
     print("Starting main benchmark run...")
 
@@ -629,7 +674,24 @@ async def benchmark(
             asyncio.create_task(
                 limited_request_func(request_func_input=request_func_input,
                                      pbar=pbar)))
-    outputs: List[RequestFuncOutput] = await asyncio.gather(*tasks)
+
+    print(f"[DBG] created {len(tasks)} tasks  max_concurrency={max_concurrency}",
+          flush=True)
+
+    watchdog_task = asyncio.create_task(_watchdog())
+    try:
+        outputs: List[RequestFuncOutput] = await asyncio.gather(*tasks)
+    finally:
+        watchdog_task.cancel()
+
+    # Report any failed requests so errors aren't silently swallowed.
+    failed = [(i, o) for i, o in enumerate(outputs) if not o.success]
+    if failed:
+        print(f"[DBG] {len(failed)}/{len(outputs)} requests FAILED:", flush=True)
+        for i, o in failed[:20]:  # cap at 20 to avoid flooding
+            print(f"  task#{i:03d}  error={o.error[:300]!r}", flush=True)
+    else:
+        print(f"[DBG] all {len(outputs)} requests succeeded", flush=True)
 
     if profile:
         print("Stopping profiler...")

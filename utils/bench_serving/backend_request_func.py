@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import itertools
 import json
 import os
 import sys
@@ -15,6 +16,18 @@ from transformers import (AutoTokenizer, PreTrainedTokenizer,
                           PreTrainedTokenizerFast)
 
 AIOHTTP_TIMEOUT = aiohttp.ClientTimeout(total=6 * 60 * 60)
+
+# ---------------------------------------------------------------------------
+# Debug helpers — each request gets a short numeric ID so log lines from
+# concurrent requests can be correlated without the full UUID.
+# ---------------------------------------------------------------------------
+_req_counter = itertools.count(1)
+
+
+def _dbg(req_id: int, msg: str) -> None:
+    ts = time.strftime("%H:%M:%S", time.localtime())
+    ms = int((time.time() % 1) * 1000)
+    print(f"[DBG {ts}.{ms:03d} req#{req_id:03d}] {msg}", flush=True)
 
 
 @dataclass
@@ -240,6 +253,10 @@ async def async_request_openai_completions(
         ("completions", "profile")
     ), "OpenAI Completions API URL must end with 'completions' or 'profile'."
 
+    req_id = next(_req_counter)
+    _dbg(req_id, f"START  url={api_url}  prompt_len={request_func_input.prompt_len}"
+                 f"  output_len={request_func_input.output_len}")
+
     async with aiohttp.ClientSession(trust_env=True,
                                      timeout=AIOHTTP_TIMEOUT) as session:
         payload = {
@@ -270,19 +287,46 @@ async def async_request_openai_completions(
         st = time.perf_counter()
         most_recent_timestamp = st
         try:
+            _dbg(req_id, "CONNECT  calling session.post ...")
             async with session.post(url=api_url, json=payload,
                                     headers=headers) as response:
+                t_connected = time.perf_counter()
+                _dbg(req_id, f"CONNECT  status={response.status}"
+                             f"  elapsed={1000*(t_connected-st):.1f}ms")
                 if response.status == 200:
                     first_chunk_received = False
-                    async for chunk_bytes in response.content:
-                        chunk_bytes = chunk_bytes.strip()
-                        if not chunk_bytes:
-                            continue
+                    chunk_idx = 0
+                    # aiohttp yields raw bytes which may contain multiple
+                    # SSE events if they arrive in the same TCP segment.
+                    # Accumulate into a buffer and split on \n\n so each
+                    # event is parsed individually (matches proxy behaviour).
+                    sse_buf = b""
+                    async for raw_bytes in response.content:
+                        chunk_idx += 1
+                        # Log first 5 chunks fully, then every 10th.
+                        if chunk_idx <= 5 or chunk_idx % 10 == 0:
+                            _dbg(req_id,
+                                 f"RAW_CHUNK #{chunk_idx}  len={len(raw_bytes)}"
+                                 f"  preview={raw_bytes[:120]!r}")
 
-                        chunk = chunk_bytes.decode("utf-8").removeprefix(
-                            "data: ")
-                        if chunk != "[DONE]":
-                            data = json.loads(chunk)
+                        sse_buf += raw_bytes
+                        # Split on SSE event boundaries.
+                        while b"\n\n" in sse_buf:
+                            event_bytes, sse_buf = sse_buf.split(b"\n\n", 1)
+                            event_str = event_bytes.strip().decode("utf-8")
+                            if not event_str:
+                                continue
+                            chunk = event_str.removeprefix("data: ")
+                            if chunk == "[DONE]":
+                                _dbg(req_id, f"[DONE] after {chunk_idx} raw chunks")
+                                continue
+                            try:
+                                data = json.loads(chunk)
+                            except json.JSONDecodeError as exc:
+                                _dbg(req_id,
+                                     f"JSON_ERROR  chunk_idx={chunk_idx}"
+                                     f"  err={exc}  raw={event_bytes[:200]!r}")
+                                continue
 
                             # NOTE: Some completion API might have a last
                             # usage summary response without a token so we
@@ -297,6 +341,9 @@ async def async_request_openai_completions(
                                     first_chunk_received = True
                                     ttft = time.perf_counter() - st
                                     output.ttft = ttft
+                                    _dbg(req_id,
+                                         f"FIRST_TOKEN  ttft={1000*ttft:.1f}ms"
+                                         f"  chunk_idx={chunk_idx}")
 
                                 # Decoding phase
                                 else:
@@ -308,6 +355,16 @@ async def async_request_openai_completions(
                             elif usage := data.get("usage"):
                                 output.output_tokens = usage.get(
                                     "completion_tokens")
+                            else:
+                                # Unknown top-level key (e.g. "metrics" from
+                                # the disagg proxy) — log and skip.
+                                _dbg(req_id,
+                                     f"UNKNOWN_KEY  keys={list(data.keys())}"
+                                     f"  chunk_idx={chunk_idx}")
+                    _dbg(req_id,
+                         f"STREAM_DONE  total_raw_chunks={chunk_idx}"
+                         f"  first_chunk_received={first_chunk_received}"
+                         f"  leftover_buf={len(sse_buf)}")
                     if first_chunk_received:
                         output.success = True
                     else:
@@ -318,12 +375,23 @@ async def async_request_openai_completions(
                     output.generated_text = generated_text
                     output.latency = most_recent_timestamp - st
                 else:
+                    body = await response.text()
                     output.error = response.reason or ""
                     output.success = False
+                    _dbg(req_id,
+                         f"HTTP_ERROR  status={response.status}"
+                         f"  reason={response.reason!r}  body={body[:300]!r}")
         except Exception:
             output.success = False
             exc_info = sys.exc_info()
             output.error = "".join(traceback.format_exception(*exc_info))
+            _dbg(req_id, f"EXCEPTION  {output.error[:400]}")
+
+    elapsed = time.perf_counter() - st
+    _dbg(req_id,
+         f"DONE  success={output.success}  ttft={1000*output.ttft:.1f}ms"
+         f"  latency={1000*elapsed:.1f}ms  output_tokens={output.output_tokens}"
+         + (f"  error={output.error[:200]!r}" if not output.success else ""))
 
     if pbar:
         pbar.update(1)
