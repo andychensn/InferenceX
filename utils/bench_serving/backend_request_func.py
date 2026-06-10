@@ -15,7 +15,10 @@ from tqdm.asyncio import tqdm
 from transformers import (AutoTokenizer, PreTrainedTokenizer,
                           PreTrainedTokenizerFast)
 
-AIOHTTP_TIMEOUT = aiohttp.ClientTimeout(total=6 * 60 * 60)
+# total=6h keeps the original long per-request budget; connect=30 makes
+# stuck TCP handshakes (SYN sent but SYN-ACK never arrives) fail within
+# 30 s instead of blocking the semaphore slot for the entire benchmark.
+AIOHTTP_TIMEOUT = aiohttp.ClientTimeout(total=6 * 60 * 60, connect=30)
 
 # ---------------------------------------------------------------------------
 # Debug helpers — each request gets a short numeric ID so log lines from
