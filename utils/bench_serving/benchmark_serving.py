@@ -804,6 +804,14 @@ def save_to_pytorch_benchmark_format(args: argparse.Namespace,
 
 
 def main(args: argparse.Namespace):
+    # When no seed is given, draw a fresh one from OS entropy so every run
+    # generates a different prompt. A fixed seed (the old default of 0) reuses
+    # the identical "random" prompt across runs, which the server's prefix
+    # cache then serves warm — making TTFT look far faster than a cold prefill.
+    if args.seed is None:
+        args.seed = int.from_bytes(os.urandom(4), "big")
+        print(f"[seed] no --seed given; using fresh random seed {args.seed} "
+              f"(prompt is unique this run -> cold prefill)")
     print(args)
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -1057,7 +1065,16 @@ if __name__ == "__main__":
         "bursty requests. A higher burstiness value (burstiness > 1) "
         "results in a more uniform arrival of requests.",
     )
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="RNG seed for prompt generation. Default: a fresh random seed "
+        "per invocation, so the generated prompt is unique each run and the "
+        "server's prefix cache cannot turn a repeat run into a (warm) cache "
+        "hit — required for honest cold-prefill TTFT. Pass an explicit value "
+        "for reproducible prompts.",
+    )
     parser.add_argument(
         "--trust-remote-code",
         action="store_true",
